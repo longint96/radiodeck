@@ -280,12 +280,26 @@ ok "Синтаксис radio.liq в порядке"
 systemctl daemon-reload
 
 log "Запускаю icecast2"
-systemctl enable --now icecast2 >/dev/null
-sleep 2
-if ! pgrep -x icecast2 >/dev/null; then
-  fail "icecast2 не поднялся (процесс не найден после старта). Проверьте:
-       journalctl -u icecast2 -n 30 --no-pager
-       Частая причина — права на <logdir> в icecast.xml. См. README, раздел 'Диагностика'."
+# ВАЖНО: "enable --now" ненадёжен для LSB/sysv-совместимых юнитов (icecast2
+# из apt именно такой — видно по строке "is not a native service" в выводе).
+# На практике он может отчитаться об успехе, реально не выполнив start —
+# поэтому enable и start вызываем раздельно и явно.
+systemctl enable icecast2 >/dev/null 2>&1 || true
+systemctl start icecast2
+
+STARTED=0
+for i in 1 2 3 4 5; do
+  sleep 1
+  if pgrep -x icecast2 >/dev/null; then
+    STARTED=1
+    break
+  fi
+done
+
+if [[ "$STARTED" != "1" ]]; then
+  err "icecast2 не поднялся (процесс не найден после старта). Последние строки журнала:"
+  journalctl -u icecast2 -n 30 --no-pager || true
+  fail "Частая причина — права на <logdir> в icecast.xml, либо занятый порт ${ICECAST_PORT}. См. README, раздел 'Диагностика'."
 fi
 ok "icecast2 запущен и виден в списке процессов"
 
