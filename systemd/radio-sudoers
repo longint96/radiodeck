@@ -1,0 +1,16 @@
+# Устанавливается в /etc/sudoers.d/radio-panel командой:
+#   sudo visudo -cf radio-sudoers && sudo cp radio-sudoers /etc/sudoers.d/radio-panel
+#
+# Разрешает пользователю "radio" (от имени которого работает портал)
+# перезапускать ТОЛЬКО liquidsoap-radio и icecast2, и ничего больше.
+#
+# ВАЖНО: liquidsoap-radio — это ОБЩИЙ движок на все радиостанции портала.
+# Перезапуск через панель (кнопка TRANSPORT, портал или любая админка
+# станции) применяет изменения сразу для ВСЕХ станций, а не только для
+# той, из чьей админки был вызван restart. Это осознанное следствие
+# архитектуры "один процесс на все станции" — см. README.md.
+
+radio ALL=(root) NOPASSWD: /usr/bin/systemctl restart liquidsoap-radio
+radio ALL=(root) NOPASSWD: /usr/bin/systemctl restart icecast2
+radio ALL=(root) NOPASSWD: /usr/bin/systemctl is-active liquidsoap-radio
+radio ALL=(root) NOPASSWD: /usr/bin/systemctl is-active icecast2

@@ -1,0 +1,17 @@
+[Unit]
+Description=Liquidsoap Radio Deck — multi-station engine
+After=network.target icecast2.service
+Requires=icecast2.service
+
+[Service]
+Type=simple
+User=radio
+Group=radio
+WorkingDirectory=/home/claude/radio-project/liquidsoap
+Environment=RADIO_LOG_DIR=/home/claude/radio-project/logs
+ExecStart=/usr/bin/liquidsoap /home/claude/radio-project/liquidsoap/radio.liq
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radio Deck — портал</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="portal-page">
+
+<div id="lockScreen" class="lock-screen">
+  <div class="lock-card">
+    <div class="lock-led"></div>
+    <h1>RADIO DECK</h1>
+    <p class="lock-sub">Портал — введите пароль администратора</p>
+    <input id="passwordInput" type="password" placeholder="Пароль портала" autofocus>
+    <button id="unlockBtn">Войти</button>
+    <p id="lockError" class="lock-error"></p>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+
+  <header class="deck-header">
+    <div class="brand">
+      <span class="brand-dot" id="onAirDot"></span>
+      <h1>RADIO DECK — PORTAL</h1>
+    </div>
+    <div class="status-strip">
+      <div class="status-item">
+        <span class="status-label">LIQUIDSOAP</span>
+        <span id="statusLiquidsoap" class="status-value status-unknown">—</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">ICECAST</span>
+        <span id="statusIcecast" class="status-value status-unknown">—</span>
+      </div>
+      <button id="refreshStatusBtn" class="btn-ghost" title="Обновить статус">↻</button>
+    </div>
+  </header>
+
+  <main class="rack">
+
+    <!-- МОДУЛЬ: СИСТЕМНЫЙ МОНИТОР -->
+    <section class="module">
+      <div class="module-plate">SYSTEM MONITOR</div>
+      <div class="module-body">
+        <div class="meter-row">
+          <div class="meter-label">
+            <span>CPU</span>
+            <span id="cpuPercentLabel">—</span>
+          </div>
+          <div class="vu-track"><div id="cpuMeterFill" class="vu-fill"></div></div>
+        </div>
+        <div class="meter-row">
+          <div class="meter-label">
+            <span>RAM</span>
+            <span id="ramLabel">—</span>
+          </div>
+          <div class="vu-track"><div id="ramMeterFill" class="vu-fill"></div></div>
+        </div>
+        <div class="meter-row">
+          <div class="meter-label">
+            <span>DISK (<span id="diskPathLabel">—</span>)</span>
+            <span id="diskLabel">—</span>
+          </div>
+          <div class="vu-track"><div id="diskMeterFill" class="vu-fill"></div></div>
+        </div>
+        <p class="hint" id="uptimeLabel"></p>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: ГЛОБАЛЬНЫЕ НАСТРОЙКИ ДВИЖКА -->
+    <section class="module">
+      <div class="module-plate">ENGINE SETTINGS</div>
+      <div class="module-body">
+        <div class="field-row">
+          <label for="globalPortInput">Порт вещания (общий для всех станций)</label>
+          <input id="globalPortInput" type="number" min="1" max="65535" placeholder="8000">
+        </div>
+        <div class="field-row">
+          <label for="globalSourcePasswordInput">Пароль источника (Icecast)</label>
+          <input id="globalSourcePasswordInput" type="text" placeholder="оставьте пустым, чтобы не менять">
+        </div>
+        <div class="module-actions">
+          <button id="saveGlobalBtn" class="btn-primary">Сохранить</button>
+          <span id="saveGlobalMsg" class="inline-msg"></span>
+        </div>
+        <p class="hint">Станции различаются mount-точкой на этом порту (например /rock-fm.mp3), а не отдельными портами.</p>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: ТРАНСПОРТ -->
+    <section class="module module-wide">
+      <div class="module-plate">TRANSPORT</div>
+      <div class="module-body">
+        <p class="hint">Перезапускает общий движок — применяет изменения сразу для ВСЕХ станций портала.</p>
+        <div class="module-actions">
+          <button id="restartBtn" class="btn-danger">⟲ Перезапустить движок</button>
+          <span id="restartMsg" class="inline-msg"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: СПИСОК СТАНЦИЙ -->
+    <section class="module module-wide">
+      <div class="module-plate">STATIONS</div>
+      <div class="module-body">
+
+        <div class="module-actions" style="margin-bottom: 18px;">
+          <button id="createStationBtn" class="btn-primary">+ Создать станцию</button>
+        </div>
+
+        <div id="stationGrid" class="station-grid">
+          <p class="hint">Загрузка...</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="deck-footer">
+    <span id="stationCount">— станций на портале</span>
+  </footer>
+</div>
+
+<div id="createModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="module-plate">СОЗДАТЬ СТАНЦИЮ</div>
+    <div class="module-body">
+
+      <div class="field-row">
+        <label for="newStationName">Название</label>
+        <input id="newStationName" type="text" placeholder="Rock FM">
+      </div>
+      <div class="field-row">
+        <label for="newStationMount">Точка монтирования (необязательно)</label>
+        <input id="newStationMount" type="text" placeholder="автоматически из названия">
+      </div>
+      <div class="field-row">
+        <label>Битрейт</label>
+        <div class="segmented" id="newBitrateSegmented">
+          <button data-value="64">64</button>
+          <button data-value="96">96</button>
+          <button data-value="128" class="active">128</button>
+          <button data-value="192">192</button>
+          <button data-value="256">256</button>
+          <button data-value="320">320</button>
+        </div>
+      </div>
+      <div class="field-row">
+        <label>Режим воспроизведения</label>
+        <div class="segmented" id="newModeSegmented">
+          <button data-value="normal" class="active">По порядку</button>
+          <button data-value="random">Случайный</button>
+        </div>
+      </div>
+      <div class="field-row">
+        <label for="newStationPassword">Пароль админки станции</label>
+        <input id="newStationPassword" type="password" placeholder="минимум 4 символа">
+      </div>
+
+      <div class="module-actions">
+        <button id="createStationSubmitBtn" class="btn-primary">Создать</button>
+        <button id="createStationCancelBtn" class="btn-secondary">Отмена</button>
+        <span id="createStationMsg" class="inline-msg"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/portal.js"></script>
+</body>
+</html>

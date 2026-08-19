@@ -1,0 +1,62 @@
+<icecast>
+    <location>Radio Deck</location>
+    <admin>admin@localhost</admin>
+
+    <limits>
+        <clients>500</clients>
+        <!-- Должно быть не меньше числа одновременно вещающих станций.
+             Портал держит это значение синхронизированным при создании станций
+             (см. lib/liquidsoapConfigGen.js) -->
+        <sources>30</sources>
+        <queue-size>524288</queue-size>
+        <client-timeout>30</client-timeout>
+        <header-timeout>15</header-timeout>
+        <source-timeout>10</source-timeout>
+        <burst-on-connect>1</burst-on-connect>
+        <burst-size>65535</burst-size>
+    </limits>
+
+    <authentication>
+        <!-- Пароль источника ДОЛЖЕН совпадать с radio_source_password из liquidsoap/global.liq -->
+        <source-password>changeme</source-password>
+        <relay-password>changeme</relay-password>
+        <admin-user>admin</admin-user>
+        <admin-password>changeme_admin</admin-password>
+    </authentication>
+
+    <!-- Один порт на ВСЕ станции — портал перезаписывает это значение
+         синхронно с radio_port в liquidsoap/global.liq. Станции различаются
+         не портом, а mount-точкой (например /rock-fm.mp3, /jazz-fm.mp3) -->
+    <hostname>localhost</hostname>
+    <listen-socket>
+        <port>8000</port>
+    </listen-socket>
+
+    <fileserve>1</fileserve>
+
+    <paths>
+        <basedir>/usr/share/icecast2</basedir>
+        <!-- ВАЖНО: НЕ меняйте на путь внутри проекта (например
+             /home/claude/radio-project/logs) — Icecast2 в Debian/Ubuntu
+             работает от системного пользователя icecast2, у которого нет
+             прав на запись в папки проекта (те принадлежат пользователю
+             radio). Указание project-логов здесь приводит к тому, что
+             демон стартует, отчитывается "done", но тут же падает молча,
+             не открыв порт — see README, раздел "Диагностика". -->
+        <logdir>/var/log/icecast2</logdir>
+        <webroot>/usr/share/icecast2/web</webroot>
+        <adminroot>/usr/share/icecast2/admin</adminroot>
+        <alias source="/" destination="/status.xsl"/>
+    </paths>
+
+    <logging>
+        <accesslog>icecast_access.log</accesslog>
+        <errorlog>icecast_error.log</errorlog>
+        <loglevel>3</loglevel>
+        <logsize>10000</logsize>
+    </logging>
+
+    <security>
+        <chroot>0</chroot>
+    </security>
+</icecast>

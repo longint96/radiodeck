@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radio Deck — станция</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div id="lockScreen" class="lock-screen">
+  <div class="lock-card">
+    <div class="lock-led"></div>
+    <h1 id="lockStationName">RADIO DECK</h1>
+    <p class="lock-sub">Введите пароль станции (или портала)</p>
+    <input id="passwordInput" type="password" placeholder="Пароль" autofocus>
+    <button id="unlockBtn">Войти</button>
+    <p id="lockError" class="lock-error"></p>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+
+  <header class="deck-header">
+    <div class="brand">
+      <a href="/" class="back-link" title="К списку станций">← Портал</a>
+      <span class="brand-dot" id="onAirDot"></span>
+      <h1 id="stationNameHeader">STATION</h1>
+    </div>
+    <div class="status-strip">
+      <div class="status-item">
+        <span class="status-label">LIQUIDSOAP</span>
+        <span id="statusLiquidsoap" class="status-value status-unknown">—</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">ICECAST</span>
+        <span id="statusIcecast" class="status-value status-unknown">—</span>
+      </div>
+      <button id="refreshStatusBtn" class="btn-ghost" title="Обновить статус">↻</button>
+    </div>
+  </header>
+
+  <p class="shared-engine-note">
+    ⚠ Движок вещания общий для всех станций портала — перезапуск в блоке
+    TRANSPORT применит изменения и <strong>на этой, и на всех остальных станциях</strong>.
+  </p>
+
+  <main class="rack">
+
+    <!-- МОДУЛЬ: ИСТОРИЯ ВОСПРОИЗВЕДЕНИЯ -->
+    <section class="module">
+      <div class="module-plate">
+        PLAYBACK HISTORY
+        <button id="clearHistoryBtn" class="history-clear-btn" title="Очистить историю">🗑</button>
+      </div>
+      <div class="module-body">
+        <ul class="history-list" id="historyList">
+          <li class="hint">Загрузка...</li>
+        </ul>
+        <span id="clearHistoryMsg" class="inline-msg"></span>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: НАСТРОЙКИ ТРАНСЛЯЦИИ -->
+    <section class="module">
+      <div class="module-plate">BROADCAST SETTINGS</div>
+      <div class="module-body">
+
+        <div class="field-row">
+          <label for="nameInput">Название станции</label>
+          <input id="nameInput" type="text">
+        </div>
+
+        <div class="field-row">
+          <label for="mountInput">Точка монтирования</label>
+          <input id="mountInput" type="text" placeholder="stream.mp3">
+        </div>
+
+        <div class="field-row">
+          <label>Адрес для слушателей</label>
+          <div class="listen-url" id="listenUrl">—</div>
+        </div>
+
+        <div class="field-row">
+          <label>Битрейт</label>
+          <div class="segmented" id="bitrateSegmented">
+            <button data-value="64">64</button>
+            <button data-value="96">96</button>
+            <button data-value="128">128</button>
+            <button data-value="192">192</button>
+            <button data-value="256">256</button>
+            <button data-value="320">320</button>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label>Режим воспроизведения</label>
+          <div class="segmented" id="modeSegmented">
+            <button data-value="normal">По порядку</button>
+            <button data-value="random">Случайный</button>
+          </div>
+        </div>
+
+        <div class="module-actions">
+          <button id="saveSettingsBtn" class="btn-primary">Сохранить настройки</button>
+          <span id="saveSettingsMsg" class="inline-msg"></span>
+        </div>
+
+        <p class="hint">Изменения записываются в конфигурацию, но применяются только после перезапуска (кнопка ниже, в блоке TRANSPORT).</p>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: ТРАНСПОРТ / УПРАВЛЕНИЕ -->
+    <section class="module module-wide">
+      <div class="module-plate">TRANSPORT</div>
+      <div class="module-body">
+        <p class="hint">Перезапускает общий движок и применяет сохранённые настройки всех станций портала.</p>
+        <div class="module-actions">
+          <button id="restartBtn" class="btn-danger">⟲ Перезапустить движок</button>
+          <span id="restartMsg" class="inline-msg"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: МЕДИАТЕКА -->
+    <section class="module module-wide">
+      <div class="module-plate">
+        MEDIA LIBRARY
+        <span class="module-plate-stats" id="libraryStats"></span>
+      </div>
+      <div class="module-body">
+
+        <div id="dropZone" class="drop-zone">
+          <p>Перетащите аудиофайлы сюда или</p>
+          <label class="btn-secondary">
+            выбрать файлы
+            <input id="fileInput" type="file" multiple accept=".mp3,.ogg,.flac,.wav,.aac,.m4a" hidden>
+          </label>
+          <p class="drop-hint">MP3 · OGG · FLAC · WAV · AAC · M4A</p>
+        </div>
+
+        <div id="uploadProgress" class="upload-progress hidden">
+          <div class="vu-track"><div id="vuFill" class="vu-fill"></div></div>
+          <span id="uploadProgressLabel">0%</span>
+        </div>
+
+        <div class="module-actions library-toolbar">
+          <input id="librarySearch" type="text" class="library-search" placeholder="Поиск по названию, исполнителю или файлу...">
+          <button id="deleteAllBtn" class="btn-danger">🗑 Удалить всё из медиатеки</button>
+          <span id="deleteAllMsg" class="inline-msg"></span>
+        </div>
+
+        <table class="track-table">
+          <thead>
+            <tr>
+              <th>Трек</th>
+              <th>Файл</th>
+              <th>Длит.</th>
+              <th>Битрейт</th>
+              <th>Размер</th>
+              <th>Добавлен</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="trackTableBody">
+            <tr><td colspan="7" class="empty-row">Загрузка...</td></tr>
+          </tbody>
+        </table>
+
+        <div class="pagination" id="libraryPagination"></div>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: ПАРОЛЬ СТАНЦИИ -->
+    <section class="module module-wide">
+      <div class="module-plate">STATION ACCESS</div>
+      <div class="module-body">
+        <div class="field-grid">
+          <div class="field-row">
+            <label for="oldPasswordInput">Текущий пароль станции</label>
+            <input id="oldPasswordInput" type="password">
+          </div>
+          <div class="field-row">
+            <label for="newPasswordInput">Новый пароль</label>
+            <input id="newPasswordInput" type="password">
+          </div>
+        </div>
+        <div class="module-actions">
+          <button id="changePasswordBtn" class="btn-secondary">Сменить пароль</button>
+          <span id="changePasswordMsg" class="inline-msg"></span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="deck-footer">
+    <span id="trackCount">— треков в медиатеке</span>
+  </footer>
+</div>
+
+<div id="tagModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="module-plate">
+      ID3 TAGS — <span id="tagModalFilename"></span>
+    </div>
+    <div class="module-body">
+
+      <div class="field-row">
+        <label for="tagTitle">Название</label>
+        <input id="tagTitle" type="text">
+      </div>
+      <div class="field-grid">
+        <div class="field-row">
+          <label for="tagArtist">Исполнитель</label>
+          <input id="tagArtist" type="text">
+        </div>
+        <div class="field-row">
+          <label for="tagAlbum">Альбом</label>
+          <input id="tagAlbum" type="text">
+        </div>
+      </div>
+      <div class="field-grid">
+        <div class="field-row">
+          <label for="tagYear">Год</label>
+          <input id="tagYear" type="text" maxlength="4" placeholder="2026">
+        </div>
+        <div class="field-row">
+          <label for="tagTrackNumber">Трек №</label>
+          <input id="tagTrackNumber" type="text" placeholder="1/12">
+        </div>
+        <div class="field-row">
+          <label for="tagGenre">Жанр</label>
+          <input id="tagGenre" type="text">
+        </div>
+      </div>
+      <div class="field-row">
+        <label for="tagComment">Комментарий</label>
+        <input id="tagComment" type="text">
+      </div>
+
+      <div class="module-actions">
+        <button id="tagSaveBtn" class="btn-primary">Сохранить теги</button>
+        <button id="tagCancelBtn" class="btn-secondary">Отмена</button>
+        <span id="tagModalMsg" class="inline-msg"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/station.js"></script>
+</body>
+</html>
