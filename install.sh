@@ -23,7 +23,7 @@ set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-/home/claude/radio-project}"
 RADIO_USER="${RADIO_USER:-radio}"
-DOWNLOAD_URL="${DOWNLOAD_URL:-https://nextcloud.longint.ru/s/4wqdme6XYgsFpwJ/download}"
+DOWNLOAD_URL="${DOWNLOAD_URL:-https://github.com/longint96/radiodeck/archive/refs/heads/main.zip}"
 PANEL_PORT="${PANEL_PORT:-3000}"
 ICECAST_PORT="${ICECAST_PORT:-8000}"
 FORCE="${FORCE:-0}"
@@ -125,10 +125,17 @@ TMP_DIR="$(mktemp -d)"
 unzip -q "$TMP_ZIP" -d "$TMP_DIR"
 rm -f "$TMP_ZIP"
 
-# Архив может содержать файлы прямо в корне или во вложенной папке radio-project/
+# Архив может содержать файлы прямо в корне или во вложенной папке —
+# имя этой папки зависит от источника (наш zip даёт "radio-project",
+# GitHub-архив ветки даёт "<репозиторий>-<ветка>", например "radiodeck-main").
+# Не полагаемся на конкретное имя — ищем реальный корень проекта по
+# наличию backend/server.js, максимум на пару уровней вложенности.
 SRC_DIR="$TMP_DIR"
-if [[ -d "$TMP_DIR/radio-project" && -f "$TMP_DIR/radio-project/README.md" ]]; then
-  SRC_DIR="$TMP_DIR/radio-project"
+if [[ ! -f "$SRC_DIR/backend/server.js" ]]; then
+  FOUND="$(find "$TMP_DIR" -maxdepth 3 -type f -path '*/backend/server.js' | head -1)"
+  if [[ -n "$FOUND" ]]; then
+    SRC_DIR="$(dirname "$(dirname "$FOUND")")"
+  fi
 fi
 [[ -f "$SRC_DIR/backend/server.js" ]] || fail "В архиве не найден backend/server.js — структура проекта не распознана."
 

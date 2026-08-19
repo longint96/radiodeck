@@ -43,10 +43,13 @@
 раздел «1–5» ниже можно заменить одной командой:
 
 ```bash
-wget -O radio-project.zip "https://nextcloud.longint.ru/s/4wqdme6XYgsFpwJ/download"
-unzip -o radio-project.zip
-sudo bash radio-project/install.sh
+sudo apt-get update && sudo apt-get install -y wget unzip
+wget -O radiodeck.zip "https://github.com/longint96/radiodeck/archive/refs/heads/main.zip"
+unzip -o radiodeck.zip
+sudo bash radiodeck-main/install.sh
 ```
+
+`wget`/`unzip` нужны здесь только для того, чтобы вытащить сам `install.sh` из архива — на минимальном образе Ubuntu Server их может не быть из коробки. Дальше уже сам скрипт ставит все нужные пакеты (в том числе `unzip` — он использует его повторно, для другой временной распаковки внутри установки).
 
 Скрипт сам: ставит системные пакеты, создаёт пользователя `radio`,
 скачивает и распаковывает проект, генерирует **случайные** пароли (портал,
