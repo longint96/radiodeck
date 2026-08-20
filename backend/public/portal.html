@@ -92,6 +92,32 @@
       </div>
     </section>
 
+    <!-- МОДУЛЬ: ПУТЬ К МЕДИАТЕКЕ -->
+    <section class="module module-wide">
+      <div class="module-plate">MEDIA STORAGE</div>
+      <div class="module-body">
+        <div class="field-row">
+          <label for="mediaPathInput">Путь к медиатеке на диске (общий для всех станций, у каждой своя подпапка)</label>
+          <input id="mediaPathInput" type="text" placeholder="/home/claude/radio-project/media">
+        </div>
+        <div class="module-actions">
+          <button id="saveMediaPathBtn" class="btn-danger">Сменить путь и перенести файлы</button>
+          <span id="saveMediaPathMsg" class="inline-msg"></span>
+        </div>
+        <p class="hint">
+          При смене пути папки всех станций <strong>автоматически переносятся</strong>
+          на новое место (не копируются с оставлением старых — исходные папки
+          удаляются после успешного переноса). Движок вещания перезапускается
+          <strong>сразу и автоматически</strong> — в отличие от остальных настроек
+          здесь это не отложено на отдельную кнопку, иначе до ручного перезапуска
+          все станции показались бы пустыми (движок ещё смотрел бы на старый путь).
+          Новый путь должен быть доступен для записи пользователю, от которого
+          работает панель.
+        </p>
+        <div id="mediaMoveReport" class="media-move-report hidden"></div>
+      </div>
+    </section>
+
     <!-- МОДУЛЬ: ТРАНСПОРТ -->
     <section class="module module-wide">
       <div class="module-plate">TRANSPORT</div>

@@ -97,7 +97,12 @@ router.post('/restart', async (req, res) => {
 // GET /api/portal/system-stats — CPU/память/диск сервера
 router.get('/system-stats', async (req, res) => {
   try {
-    const diskPath = process.env.MEDIA_BASE_DIR || '/';
+    let diskPath = '/';
+    try {
+      diskPath = registry.getMediaBaseDir();
+    } catch {
+      /* путь к медиатеке ещё не задан нигде — считаем диск для корня */
+    }
     res.json(await systemStats.getSystemStats(diskPath));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -131,6 +136,27 @@ router.get('/library-stats', async (req, res) => {
     res.json({ stats });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/portal/media-base-dir — сменить путь к медиатеке.
+// Автоматически переносит папки существующих станций на новое место и
+// СРАЗУ перезапускает движок (не откладывая, как остальные настройки) —
+// до перезапуска liquidsoap продолжает следить за старым, уже опустевшим
+// путём, и станции покажутся пустыми.
+router.post('/media-base-dir', async (req, res) => {
+  try {
+    const { path: newPath } = req.body;
+    const result = await registry.updateMediaBaseDir(newPath);
+
+    if (result.changed) {
+      liquidsoapConfigGen.regenerate();
+      await serviceControl.restart();
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

@@ -76,6 +76,7 @@ async function loadGlobal() {
   try {
     const g = await api('/api/portal/global');
     document.getElementById('globalPortInput').value = g.port;
+    document.getElementById('mediaPathInput').value = g.mediaBaseDir || '';
     state.globalPort = g.port;
   } catch (err) {
     console.error(err);
@@ -100,6 +101,59 @@ document.getElementById('saveGlobalBtn').addEventListener('click', async () => {
     state.globalPort = port;
     msg.textContent = 'Сохранено. Перезапустите движок для применения.';
     loadStations();
+  } catch (err) {
+    msg.textContent = `Ошибка: ${err.message}`;
+  }
+});
+
+// ---------- Путь к медиатеке ----------
+
+document.getElementById('saveMediaPathBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('saveMediaPathMsg');
+  const reportEl = document.getElementById('mediaMoveReport');
+  const newPath = document.getElementById('mediaPathInput').value.trim();
+
+  if (!newPath || !newPath.startsWith('/')) {
+    msg.textContent = 'Путь должен быть абсолютным (начинаться с /)';
+    return;
+  }
+
+  if (!confirm(
+    `Сменить путь к медиатеке на:\n${newPath}\n\n` +
+    `Папки ВСЕХ станций будут перенесены на новое место (не скопированы —\n` +
+    `перенесены, исходные папки удалятся). Движок вещания будет автоматически\n` +
+    `перезапущен сразу после переноса. Продолжить?`
+  )) {
+    return;
+  }
+
+  const typed = prompt('Подтвердите — наберите слово ПЕРЕНЕСТИ:');
+  if (typed !== 'ПЕРЕНЕСТИ') {
+    msg.textContent = typed === null ? '' : 'Отменено — слово введено неверно.';
+    return;
+  }
+
+  msg.textContent = 'Переношу файлы и перезапускаю движок — это может занять время...';
+  reportEl.classList.add('hidden');
+  try {
+    const result = await api('/api/portal/media-base-dir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: newPath }),
+    });
+
+    if (!result.changed) {
+      msg.textContent = 'Путь не изменился — переносить нечего.';
+      return;
+    }
+
+    msg.textContent = 'Готово. Движок перезапущен.';
+    reportEl.classList.remove('hidden');
+    reportEl.innerHTML = `
+      ${result.moved.length ? `<div>Перенесены станции: ${result.moved.join(', ')}</div>` : ''}
+      ${result.errors.length ? `<div class="media-move-errors">${result.errors.map(escapeHtml).join('<br>')}</div>` : ''}
+    `;
+    loadSystemStats();
   } catch (err) {
     msg.textContent = `Ошибка: ${err.message}`;
   }

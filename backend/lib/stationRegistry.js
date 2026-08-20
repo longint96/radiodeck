@@ -13,7 +13,6 @@ const ALLOWED_BITRATES = [64, 96, 128, 192, 256, 320];
 
 function assertPaths() {
   if (!REGISTRY_PATH) throw new Error('STATIONS_REGISTRY не задан в .env');
-  if (!MEDIA_BASE_DIR) throw new Error('MEDIA_BASE_DIR не задан в .env');
 }
 
 function defaultRegistry() {
@@ -21,6 +20,7 @@ function defaultRegistry() {
     global: {
       port: 8000,
       sourcePassword: 'changeme',
+      mediaBaseDir: MEDIA_BASE_DIR || null,
     },
     stations: [],
   };
@@ -57,8 +57,83 @@ function toPublicStation(station) {
   return rest;
 }
 
+function getMediaBaseDir() {
+  const registry = readRegistryRaw();
+  const dir = registry.global.mediaBaseDir || MEDIA_BASE_DIR;
+  if (!dir) {
+    throw new Error('Путь к медиатеке не задан ни в настройках портала, ни в MEDIA_BASE_DIR (.env)');
+  }
+  return dir;
+}
+
 function mediaDirFor(slug) {
-  return path.join(MEDIA_BASE_DIR, slug);
+  return path.join(getMediaBaseDir(), slug);
+}
+
+function moveDirRecursive(src, dest) {
+  try {
+    fs.renameSync(src, dest);
+  } catch (err) {
+    if (err.code !== 'EXDEV') throw err;
+    // Старый и новый путь на разных файловых системах — rename так не умеет,
+    // копируем содержимое и удаляем источник только после успешного копирования
+    fs.cpSync(src, dest, { recursive: true });
+    fs.rmSync(src, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Меняет базовый путь медиатеки и переносит папки уже существующих станций
+ * со старого пути на новый (rename, либо copy+delete между файловыми
+ * системами). Папки, которых не было на старом месте, просто создаются
+ * пустыми на новом. Если на новом месте уже есть папка с именем станции —
+ * трек не переносится, ошибка сообщается по этой станции, остальные
+ * переносятся как обычно (не блокируем всю операцию из-за одной коллизии).
+ */
+async function updateMediaBaseDir(newBaseDir) {
+  if (!newBaseDir || typeof newBaseDir !== 'string' || !path.isAbsolute(newBaseDir)) {
+    throw new Error('Путь к медиатеке должен быть абсолютным (начинаться с /)');
+  }
+  const cleanNew = path.resolve(newBaseDir);
+
+  return withWriteLock(() => {
+    const registry = readRegistryRaw();
+    const oldBaseDir = registry.global.mediaBaseDir || MEDIA_BASE_DIR;
+    const cleanOld = oldBaseDir ? path.resolve(oldBaseDir) : null;
+
+    if (cleanOld === cleanNew) {
+      return { changed: false, moved: [], errors: [], mediaBaseDir: cleanNew };
+    }
+
+    fs.mkdirSync(cleanNew, { recursive: true });
+
+    const moved = [];
+    const errors = [];
+    for (const station of registry.stations) {
+      const oldDir = cleanOld ? path.join(cleanOld, station.slug) : null;
+      const newDir = path.join(cleanNew, station.slug);
+
+      if (fs.existsSync(newDir)) {
+        errors.push(`${station.slug}: на новом пути уже есть папка с этим именем — пропущено, перенесите вручную`);
+        continue;
+      }
+      if (!oldDir || !fs.existsSync(oldDir)) {
+        fs.mkdirSync(newDir, { recursive: true }); // на старом месте ничего не было — создаём пустую
+        continue;
+      }
+      try {
+        moveDirRecursive(oldDir, newDir);
+        moved.push(station.slug);
+      } catch (err) {
+        errors.push(`${station.slug}: ${err.message}`);
+      }
+    }
+
+    registry.global.mediaBaseDir = cleanNew;
+    writeRegistryRaw(registry);
+
+    return { changed: true, moved, errors, mediaBaseDir: cleanNew };
+  });
 }
 
 // ============================================================
@@ -235,6 +310,8 @@ module.exports = {
   changeStationPassword,
   deleteStation,
   updateGlobalSettings,
+  updateMediaBaseDir,
   verifyStationPassword,
   mediaDirFor,
+  getMediaBaseDir,
 };
