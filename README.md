@@ -66,13 +66,27 @@ sudo bash radiodeck-main/install.sh
 sudo INSTALL_DIR=/opt/radio-deck RADIO_USER=radiosvc PANEL_PORT=4000 ICECAST_PORT=8080 bash install.sh
 ```
 
+Если медиатека должна с самого начала лежать на отдельном диске/точке
+монтирования (а не рядом с кодом проекта) — `MEDIA_BASE_DIR` независим
+от `INSTALL_DIR`:
+
+```bash
+sudo MEDIA_BASE_DIR=/mnt/storage/radio-media bash install.sh
+```
+
 | Переменная | По умолчанию |
 |---|---|
 | `INSTALL_DIR` | `/home/claude/radio-project` |
 | `RADIO_USER` | `radio` |
 | `PANEL_PORT` | `3000` |
 | `ICECAST_PORT` | `8000` |
+| `MEDIA_BASE_DIR` | `INSTALL_DIR/media` |
 | `DOWNLOAD_URL` | ссылка на актуальный архив проекта |
+
+Путь из `MEDIA_BASE_DIR` при установке — это лишь **начальное** значение;
+дальше он живёт в реестре станций и меняется через портал (ENGINE
+SETTINGS → MEDIA STORAGE, с автоматическим переносом уже загруженных
+файлов), а не повторной установкой или правкой `.env`.
 
 Скрипт откажется работать поверх уже установленного проекта (проверяет
 `data/stations.json`), чтобы случайно не затереть рабочие станции —

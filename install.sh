@@ -11,9 +11,13 @@
 #   DOWNLOAD_URL       — прямая ссылка на архив проекта
 #   PANEL_PORT       — порт веб-панели (по умолчанию 3000)
 #   ICECAST_PORT      — порт вещания Icecast (по умолчанию 8000)
+#   MEDIA_BASE_DIR    — куда класть медиатеки станций (по умолчанию INSTALL_DIR/media;
+#                       можно указать отдельный диск/точку монтирования с самого начала)
 #   FORCE             — "1", чтобы переустановить поверх существующей папки
 #
 # Пример: sudo INSTALL_DIR=/opt/radio-deck PANEL_PORT=4000 bash install.sh
+# Пример с отдельным диском под медиатеку:
+#   sudo MEDIA_BASE_DIR=/mnt/storage/radio-media bash install.sh
 
 set -euo pipefail
 
@@ -26,6 +30,10 @@ RADIO_USER="${RADIO_USER:-radio}"
 DOWNLOAD_URL="${DOWNLOAD_URL:-https://github.com/longint96/radiodeck/archive/refs/heads/main.zip}"
 PANEL_PORT="${PANEL_PORT:-3000}"
 ICECAST_PORT="${ICECAST_PORT:-8000}"
+# Отдельная переменная, а не жёстко "$INSTALL_DIR/media" — задаётся ПОСЛЕ
+# INSTALL_DIR, чтобы дефолт мог на него ссылаться, но при этом её можно
+# переопределить независимо (например, смонтированный отдельный диск)
+MEDIA_BASE_DIR="${MEDIA_BASE_DIR:-$INSTALL_DIR/media}"
 FORCE="${FORCE:-0}"
 
 # Пути установки systemd/sudoers — обычно не меняются
@@ -148,9 +156,23 @@ ok "Проект распакован в $INSTALL_DIR"
 # 4. Директории данных
 # ============================================================
 
-mkdir -p "$INSTALL_DIR"/{media,logs,data}
+mkdir -p "$INSTALL_DIR"/{logs,data}
 chown -R "$RADIO_USER:$RADIO_USER" "$INSTALL_DIR"
 ok "Права на $INSTALL_DIR переданы пользователю $RADIO_USER"
+
+# Медиатека — отдельно от остального INSTALL_DIR: MEDIA_BASE_DIR может
+# указывать на смонтированный отдельный диск вне проекта, поэтому chown
+# для неё делаем явно, не полагаясь на рекурсивный chown выше
+mkdir -p "$MEDIA_BASE_DIR"
+chown -R "$RADIO_USER:$RADIO_USER" "$MEDIA_BASE_DIR"
+ok "Медиатека: $MEDIA_BASE_DIR (права переданы $RADIO_USER)"
+
+# В архиве есть пустая заглушка media/.gitkeep (для git) — если реальная
+# медиатека настроена в другом месте, убираем её, чтобы не путала при
+# просмотре INSTALL_DIR (сам код её никак не использует и так)
+if [[ "$(realpath -m "$MEDIA_BASE_DIR")" != "$(realpath -m "$INSTALL_DIR/media")" ]]; then
+  rm -rf "${INSTALL_DIR:?}/media"
+fi
 
 # ============================================================
 # 5. Генерация паролей и подготовка icecast.xml + data/stations.json
@@ -178,7 +200,8 @@ cat > "$INSTALL_DIR/data/stations.json" <<JSON
 {
   "global": {
     "port": ${ICECAST_PORT},
-    "sourcePassword": "${SOURCE_PASSWORD}"
+    "sourcePassword": "${SOURCE_PASSWORD}",
+    "mediaBaseDir": "${MEDIA_BASE_DIR}"
   },
   "stations": []
 }
@@ -207,7 +230,7 @@ cat > "$INSTALL_DIR/backend/.env" <<ENV
 PANEL_PORT=${PANEL_PORT}
 PORTAL_PASSWORD=${PORTAL_PASSWORD}
 
-MEDIA_BASE_DIR=${INSTALL_DIR}/media
+MEDIA_BASE_DIR=${MEDIA_BASE_DIR}
 STATIONS_REGISTRY=${INSTALL_DIR}/data/stations.json
 LIQUIDSOAP_GLOBAL_CONFIG=${INSTALL_DIR}/liquidsoap/global.liq
 LIQUIDSOAP_STATIONS_CONFIG=${INSTALL_DIR}/liquidsoap/stations.liq
@@ -349,6 +372,9 @@ Icecast admin UI:     http://${SERVER_IP}:${ICECAST_PORT}/admin/
 Icecast admin логин:  admin
 Icecast admin пароль: ${ADMIN_PASSWORD}
 Пароль источника:     ${SOURCE_PASSWORD}   (уже прописан в icecast.xml и data/stations.json — трогать не нужно)
+
+Проект:               ${INSTALL_DIR}
+Медиатека:            ${MEDIA_BASE_DIR}   (меняется потом через портал: ENGINE SETTINGS → MEDIA STORAGE)
 
 Файл: $CREDENTIALS_FILE (chmod 600, только root)
 CREDS
