@@ -86,3 +86,14 @@ end
 # --- Применяем ко всем станциям из реестра ----------------------
 
 list.iter(make_station, stations)
+
+# Если станций пока нет (совсем новая установка, либо все станции
+# удалены) — ни один make_station не создаст output.icecast, и у скрипта
+# не будет вообще ни одного output. Liquidsoap в этом случае отказывается
+# стартовать ("No output defined, nothing to do") и завершается с ошибкой —
+# а systemd с Restart=on-failure уходит в бесконечный цикл перезапуска.
+# Безобидный dummy-output держит процесс живым и просто ждёт первую
+# реальную станцию, ничего никуда не отправляя.
+if list.length(stations) == 0 then
+  output.dummy(blank())
+end

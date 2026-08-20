@@ -196,10 +196,14 @@ async function createStation({ name, bitrate = 128, mode = 'normal', mount, pass
       createdAt: new Date().toISOString(),
     };
 
+    // Папку медиатеки создаём ДО записи в реестр: если mkdir упадёт
+    // (например, нет прав на смонтированный отдельно диск) — реестр
+    // останется нетронутым, а не в рассогласованном состоянии
+    // "станция есть в data/stations.json, а конфиг liquidsoap про неё не знает"
+    fs.mkdirSync(mediaDirFor(slug), { recursive: true });
+
     registry.stations.push(station);
     writeRegistryRaw(registry);
-
-    fs.mkdirSync(mediaDirFor(slug), { recursive: true });
 
     return toPublicStation(station);
   });
