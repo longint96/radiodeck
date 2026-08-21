@@ -14,3 +14,9 @@ radio ALL=(root) NOPASSWD: /usr/bin/systemctl restart liquidsoap-radio
 radio ALL=(root) NOPASSWD: /usr/bin/systemctl restart icecast2
 radio ALL=(root) NOPASSWD: /usr/bin/systemctl is-active liquidsoap-radio
 radio ALL=(root) NOPASSWD: /usr/bin/systemctl is-active icecast2
+
+# Восстановление владельца файлов медиатеки (radio:radio) — нужно, когда
+# файлы попадают в папку станции в обход панели (например, через WinSCP/SFTP
+# от другого пользователя). Скрипт без аргументов — путь читает сам из
+# реестра, поэтому команда полностью статична и безопасна для NOPASSWD.
+radio ALL=(root) NOPASSWD: /home/claude/radio-project/scripts/fix-media-permissions.sh

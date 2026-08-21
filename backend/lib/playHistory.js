@@ -4,7 +4,7 @@ const path = require('path');
 const registry = require('./stationRegistry');
 const icecastStatus = require('./icecastStatus');
 
-const MAX_ENTRIES = 15;
+const MAX_ENTRIES = 50;
 const MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // 3 суток — записи старше отсекаются
 
 function pruneOld(entries) {

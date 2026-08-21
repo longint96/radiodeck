@@ -160,6 +160,17 @@ document.getElementById('saveMediaPathBtn').addEventListener('click', async () =
   }
 });
 
+document.getElementById('fixPermissionsBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('fixPermissionsMsg');
+  msg.textContent = 'Восстанавливаю права...';
+  try {
+    const result = await api('/api/portal/fix-media-permissions', { method: 'POST' });
+    msg.textContent = result.output || 'Готово.';
+  } catch (err) {
+    msg.textContent = `Ошибка: ${err.message}`;
+  }
+});
+
 // ---------- Системный монитор ----------
 
 async function loadSystemStats() {
@@ -272,22 +283,45 @@ function renderListenersChart() {
     return;
   }
 
-  const values = state.stations.map((s) => state.nowPlaying[s.slug]?.listeners ?? 0);
-  const maxValue = Math.max(1, ...values); // защита от деления на 0, когда везде 0
+  const currentValues = state.stations.map((s) => state.nowPlaying[s.slug]?.listeners ?? 0);
+  const peakValues = state.stations.map((s) => state.nowPlaying[s.slug]?.listenerPeak ?? 0);
+  // Нормализуем оба столбца по ОБЩЕМУ максимуму (текущие и пиковые вместе) —
+  // иначе столбцы current/peak по разным станциям были бы несравнимы между собой
+  const maxValue = Math.max(1, ...currentValues, ...peakValues);
 
-  chart.innerHTML = state.stations.map((s, i) => {
-    const listeners = values[i];
-    const heightPct = Math.round((listeners / maxValue) * 100);
-    return `
-      <div class="listeners-bar-col" title="${escapeHtml(s.name)}: ${listeners} слушателей">
-        <div class="listeners-bar-value">${listeners}</div>
-        <div class="listeners-bar-track">
-          <div class="listeners-bar-fill" style="height: ${heightPct}%"></div>
-        </div>
-        <div class="listeners-bar-label">${escapeHtml(s.name)}</div>
-      </div>
-    `;
-  }).join('');
+  chart.innerHTML = `
+    <div class="listeners-chart-legend">
+      <span><span class="legend-swatch legend-swatch-current"></span> сейчас</span>
+      <span><span class="legend-swatch legend-swatch-peak"></span> пик с последнего рестарта</span>
+    </div>
+    <div class="listeners-chart-bars">
+      ${state.stations.map((s, i) => {
+        const current = currentValues[i];
+        const peak = peakValues[i];
+        const currentPct = Math.round((current / maxValue) * 100);
+        const peakPct = Math.round((peak / maxValue) * 100);
+        return `
+          <div class="listeners-bar-col" title="${escapeHtml(s.name)}: сейчас ${current}, пик ${peak}">
+            <div class="listeners-bar-group">
+              <div class="listeners-bar-item">
+                <div class="listeners-bar-value">${current}</div>
+                <div class="listeners-bar-track">
+                  <div class="listeners-bar-fill listeners-bar-fill-current" style="height: ${currentPct}%"></div>
+                </div>
+              </div>
+              <div class="listeners-bar-item">
+                <div class="listeners-bar-value listeners-bar-value-peak">${peak}</div>
+                <div class="listeners-bar-track">
+                  <div class="listeners-bar-fill listeners-bar-fill-peak" style="height: ${peakPct}%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="listeners-bar-label">${escapeHtml(s.name)}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
 function applyNowPlayingToCards() {
@@ -310,7 +344,7 @@ function applyNowPlayingToCards() {
     }
     if (listenersEl) {
       listenersEl.textContent = info.online && info.listeners != null
-        ? `👤 ${info.listeners}`
+        ? `👤 ${info.listeners} сейчас · макс. ${info.listenerPeak ?? '—'}`
         : '';
     }
   });

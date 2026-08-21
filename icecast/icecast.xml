@@ -32,12 +32,7 @@
         <port>8000</port>
     </listen-socket>
 
-    <!-- fileserve=0: отключает публичную статус-страницу Icecast и веб-админку
-         (те, что открываются в браузере по адресу http://host:port/).
-         На сами потоки станций (mount-точки типа /rock, /jazz) НЕ влияет —
-         это отдельный механизм (приём source-подключения от liquidsoap и
-         релей слушателям), не связанный с раздачей статичных файлов. -->
-    <fileserve>0</fileserve>
+    <fileserve>1</fileserve>
 
     <paths>
         <basedir>/usr/share/icecast2</basedir>
@@ -51,6 +46,7 @@
         <logdir>/var/log/icecast2</logdir>
         <webroot>/usr/share/icecast2/web</webroot>
         <adminroot>/usr/share/icecast2/admin</adminroot>
+        <alias source="/" destination="/status.xsl"/>
     </paths>
 
     <logging>

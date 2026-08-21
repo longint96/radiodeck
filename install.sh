@@ -264,7 +264,10 @@ done
 ok "Юниты установлены в $SYSTEMD_DIR"
 
 log "Устанавливаю sudoers-правило"
-sed -e "s|^radio |${RADIO_USER} |g" "$INSTALL_DIR/systemd/radio-sudoers" > /tmp/radio-sudoers-generated
+sed \
+  -e "s|^radio |${RADIO_USER} |g" \
+  -e "s|/home/claude/radio-project|${INSTALL_DIR}|g" \
+  "$INSTALL_DIR/systemd/radio-sudoers" > /tmp/radio-sudoers-generated
 if visudo -cf /tmp/radio-sudoers-generated; then
   cp /tmp/radio-sudoers-generated "$SUDOERS_FILE"
   chmod 440 "$SUDOERS_FILE"
@@ -274,6 +277,15 @@ else
   fail "Сгенерированный sudoers-файл не прошёл проверку visudo — установка прервана."
 fi
 rm -f /tmp/radio-sudoers-generated
+
+log "Устанавливаю скрипт восстановления прав медиатеки"
+mkdir -p "$INSTALL_DIR/scripts"
+sed "s|/home/claude/radio-project|${INSTALL_DIR}|g" \
+  "$INSTALL_DIR/scripts/fix-media-permissions.sh" > /tmp/fix-media-permissions-generated.sh
+mv /tmp/fix-media-permissions-generated.sh "$INSTALL_DIR/scripts/fix-media-permissions.sh"
+chmod +x "$INSTALL_DIR/scripts/fix-media-permissions.sh"
+chown "$RADIO_USER:$RADIO_USER" "$INSTALL_DIR/scripts/fix-media-permissions.sh"
+ok "Скрипт восстановления прав установлен"
 
 # ============================================================
 # 9. Зависимости backend

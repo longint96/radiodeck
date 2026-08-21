@@ -182,19 +182,44 @@ async function loadStatus() {
       listenersEl.classList.add('status-unknown');
     }
 
-    const banner = document.getElementById('nowPlayingBanner');
-    if (s.online && s.nowPlayingTitle) {
-      banner.textContent = `▶ Сейчас играет: ${s.nowPlayingTitle}`;
-      banner.classList.remove('hidden');
+    const peakEl = document.getElementById('statusListenerPeak');
+    peakEl.classList.remove('status-on', 'status-off', 'status-unknown');
+    if (s.online && s.listenerPeak != null) {
+      peakEl.textContent = String(s.listenerPeak);
+      peakEl.classList.add('status-on');
     } else {
-      banner.classList.add('hidden');
+      peakEl.textContent = '—';
+      peakEl.classList.add('status-unknown');
     }
+
+    const nowPlayingValueEl = document.getElementById('statusNowPlayingValue');
+    nowPlayingValueEl.textContent = s.online
+      ? (s.nowPlayingTitle ? s.nowPlayingTitle : 'в эфире')
+      : 'офлайн';
+
+    renderStationListenersChart(s.online ? s.listeners : 0, s.online ? s.listenerPeak : 0);
 
     const onAirDot = document.getElementById('onAirDot');
     onAirDot.classList.toggle('live', !!s.liquidsoap);
   } catch (err) {
     console.error(err);
   }
+}
+
+/**
+ * Мини-диаграмма слушателей ОДНОЙ станции: два столбика (сейчас / пик),
+ * тот же визуальный язык, что у диаграммы на портале, но без сравнения
+ * между станциями — нормализация только по этим двум значениям.
+ */
+function renderStationListenersChart(current, peak) {
+  const c = current ?? 0;
+  const p = peak ?? 0;
+  const maxValue = Math.max(1, c, p);
+
+  document.getElementById('stationChartCurrentValue').textContent = current != null ? String(c) : '—';
+  document.getElementById('stationChartPeakValue').textContent = peak != null ? String(p) : '—';
+  document.getElementById('stationChartCurrentFill').style.height = `${Math.round((c / maxValue) * 100)}%`;
+  document.getElementById('stationChartPeakFill').style.height = `${Math.round((p / maxValue) * 100)}%`;
 }
 
 function renderStatus(elId, value) {

@@ -5,6 +5,7 @@ const serviceControl = require('../lib/serviceControl');
 const systemStats = require('../lib/systemStats');
 const icecastStatus = require('../lib/icecastStatus');
 const mediaInfo = require('../lib/mediaInfo');
+const mediaPermissions = require('../lib/mediaPermissions');
 
 const router = express.Router();
 
@@ -156,6 +157,19 @@ router.post('/media-base-dir', async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/portal/fix-media-permissions — восстановить владельца (radio:radio)
+// всех файлов медиатеки. Нужно после загрузки файлов в обход панели
+// (например, через WinSCP/SFTP от другого системного пользователя) —
+// backend работает от radio и не может читать/писать теги в чужих файлах.
+router.post('/fix-media-permissions', async (req, res) => {
+  try {
+    const output = await mediaPermissions.fixMediaPermissions();
+    res.json({ ok: true, output });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

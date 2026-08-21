@@ -7,20 +7,42 @@
 const AUDIO_EXT_RE = /\.(mp3|ogg|flac|wav|aac|m4a)$/i;
 
 /**
+ * Некоторые старые тегеры (примерно 2000-2010е) записывали кириллицу и
+ * другие не-ASCII символы в ID3v1-поля как HTML-сущности вместо настоящего
+ * UTF-8 — ID3v1 физически не поддерживает кириллицу, вот и обходили так.
+ * В таком виде title приходит буквально как "&#1069;&#1092;&#1080;&#1088;"
+ * вместо "Эфир". Декодируем числовые сущности (десятичные и hex) и
+ * несколько базовых именованных — остальной текст не трогаем.
+ */
+function decodeHtmlEntities(str) {
+  if (!str) return str;
+  return str
+    .replace(/&#(\d+);/g, (_, num) => String.fromCodePoint(parseInt(num, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+/**
  * Если у трека пустые теги, liquidsoap (см. radio.liq, fallback_title)
  * подставляет вместо title полный путь к файлу — иначе трек вообще выпал
  * бы из "сейчас играет"/истории. Здесь сокращаем этот путь до последних
  * двух сегментов ("папка/имя_файла.mp3"), чтобы не показывать в интерфейсе
  * длинный абсолютный путь вида "/mediateka/radio/rock/album1/track.mp3".
- * Настоящие теги (не похожие на путь к файлу) не трогаем вообще.
+ * Настоящие теги (не похожие на путь к файлу) не трогаем вообще, кроме
+ * декодирования HTML-сущностей (см. decodeHtmlEntities выше).
  */
 function prettifyTitle(rawTitle) {
   if (!rawTitle) return rawTitle;
-  if (rawTitle.includes('/') && AUDIO_EXT_RE.test(rawTitle)) {
-    const parts = rawTitle.split('/').filter(Boolean);
+  const decoded = decodeHtmlEntities(rawTitle);
+  if (decoded.includes('/') && AUDIO_EXT_RE.test(decoded)) {
+    const parts = decoded.split('/').filter(Boolean);
     return parts.slice(-2).join('/');
   }
-  return rawTitle;
+  return decoded;
 }
 
 async function fetchIcecastStatus(port) {
@@ -77,6 +99,12 @@ async function getMountStatuses(port) {
       online: true,
       title: prettifyTitle(src.title || src.yp_currently_playing || null),
       listeners: typeof src.listeners === 'number' ? src.listeners : null,
+      // Пик слушателей С МОМЕНТА ПОДКЛЮЧЕНИЯ ИСТОЧНИКА — это встроенная
+      // метрика самого Icecast, не наша. Сбрасывается в 0 при каждом
+      // подключении источника заново (то есть при каждом restart движка
+      // через TRANSPORT) — НЕ "рекорд за всё время", а именно "с последнего
+      // рестарта". Уточнено в README и в подсказке интерфейса.
+      listenerPeak: typeof src.listener_peak === 'number' ? src.listener_peak : null,
     });
   }
 
@@ -99,6 +127,7 @@ async function getNowPlaying(stations, port) {
         online: !!status,
         title: status?.title || null,
         listeners: status?.listeners ?? null,
+        listenerPeak: status?.listenerPeak ?? null,
       };
     }),
   };

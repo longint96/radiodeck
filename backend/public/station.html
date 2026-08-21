@@ -43,13 +43,15 @@
         <span class="status-label">СЛУШАТЕЛИ</span>
         <span id="statusListeners" class="status-value status-unknown">—</span>
       </div>
+      <div class="status-item">
+        <span class="status-label">ПИК</span>
+        <span id="statusListenerPeak" class="status-value status-unknown">—</span>
+      </div>
       <button id="refreshStatusBtn" class="btn-ghost" title="Обновить статус">↻</button>
     </div>
   </header>
 
-  <p id="nowPlayingBanner" class="now-playing-banner hidden"></p>
-
-  <main class="rack">
+  <main class="rack station-rack">
 
     <!-- МОДУЛЬ: ИСТОРИЯ ВОСПРОИЗВЕДЕНИЯ -->
     <section class="module">
@@ -111,6 +113,39 @@
         </div>
 
         <p class="hint">Изменения записываются в конфигурацию, но применяются только после перезапуска (кнопка ниже, в блоке TRANSPORT).</p>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: СТАТУС (сейчас играет + слушатели) -->
+    <section class="module">
+      <div class="module-plate">STATUS</div>
+      <div class="module-body">
+        <div class="field-row">
+          <label>Сейчас играет</label>
+          <div class="now-playing-value" id="statusNowPlayingValue">—</div>
+        </div>
+        <div class="field-row">
+          <label>Слушатели</label>
+          <div class="listeners-chart-legend">
+            <span><span class="legend-swatch legend-swatch-current"></span> сейчас</span>
+            <span><span class="legend-swatch legend-swatch-peak"></span> пик</span>
+          </div>
+          <div class="listeners-bar-group station-listeners-chart" id="stationListenersChart">
+            <div class="listeners-bar-item">
+              <div class="listeners-bar-value" id="stationChartCurrentValue">—</div>
+              <div class="listeners-bar-track">
+                <div class="listeners-bar-fill listeners-bar-fill-current" id="stationChartCurrentFill" style="height: 0%"></div>
+              </div>
+            </div>
+            <div class="listeners-bar-item">
+              <div class="listeners-bar-value listeners-bar-value-peak" id="stationChartPeakValue">—</div>
+              <div class="listeners-bar-track">
+                <div class="listeners-bar-fill listeners-bar-fill-peak" id="stationChartPeakFill" style="height: 0%"></div>
+              </div>
+            </div>
+          </div>
+          <p class="hint">Пик — с последнего перезапуска движка, не рекорд за всё время.</p>
+        </div>
       </div>
     </section>
 

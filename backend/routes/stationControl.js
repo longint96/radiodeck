@@ -14,13 +14,14 @@ router.get('/status', async (req, res) => {
 
     const global = registry.getGlobalSettings();
     const { stations } = await icecastStatus.getNowPlaying([req.station], global.port);
-    const own = stations[0] || { online: false, title: null, listeners: null };
+    const own = stations[0] || { online: false, title: null, listeners: null, listenerPeak: null };
 
     res.json({
       ...serviceStatus,
       online: own.online,
       nowPlayingTitle: own.title,
       listeners: own.listeners,
+      listenerPeak: own.listenerPeak,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

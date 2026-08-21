@@ -142,6 +142,20 @@
           работает панель.
         </p>
         <div id="mediaMoveReport" class="media-move-report hidden"></div>
+
+        <hr class="module-divider">
+
+        <p class="hint">
+          Если файлы попали в медиатеку в обход панели (например, залиты
+          напрямую через WinSCP/SFTP) — панель работает от системного
+          пользователя <code>radio</code> и может не иметь прав читать/писать
+          их ID3-теги. Эта кнопка восстанавливает владельца всех файлов
+          медиатеки на <code>radio</code>.
+        </p>
+        <div class="module-actions">
+          <button id="fixPermissionsBtn" class="btn-secondary">🔧 Исправить права на файлы медиатеки</button>
+          <span id="fixPermissionsMsg" class="inline-msg"></span>
+        </div>
       </div>
     </section>
 
