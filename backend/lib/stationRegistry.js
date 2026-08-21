@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const { hashPassword, verifyPassword } = require('./auth');
 const { slugify, uniqueSlug } = require('./slug');
 
 const REGISTRY_PATH = process.env.STATIONS_REGISTRY;
@@ -53,6 +52,10 @@ function writeRegistryRaw(registry) {
 }
 
 function toPublicStation(station) {
+  // Экранируем passwordHash защитно: у станций, созданных ДО отказа от
+  // станционных паролей, это поле может остаться в data/stations.json —
+  // наружу его отдавать незачем, даже если оно больше не используется
+  // для аутентификации.
   const { passwordHash, ...rest } = station;
   return rest;
 }
@@ -168,9 +171,8 @@ function validateStationFields({ bitrate, mode }) {
   }
 }
 
-async function createStation({ name, bitrate = 128, mode = 'normal', mount, password }) {
+async function createStation({ name, bitrate = 128, mode = 'normal', mount }) {
   if (!name || !name.trim()) throw new Error('Название станции обязательно');
-  if (!password || password.length < 4) throw new Error('Пароль станции должен быть не короче 4 символов');
   validateStationFields({ bitrate, mode });
 
   return withWriteLock(() => {
@@ -192,7 +194,6 @@ async function createStation({ name, bitrate = 128, mode = 'normal', mount, pass
       mount: finalMount,
       bitrate,
       mode,
-      passwordHash: hashPassword(password),
       createdAt: new Date().toISOString(),
     };
 
@@ -245,24 +246,6 @@ async function renameStation(id, name) {
   });
 }
 
-async function changeStationPassword(id, oldPassword, newPassword) {
-  if (!newPassword || newPassword.length < 4) {
-    throw new Error('Новый пароль должен быть не короче 4 символов');
-  }
-
-  return withWriteLock(() => {
-    const registry = readRegistryRaw();
-    const station = registry.stations.find((s) => s.id === id || s.slug === id);
-    if (!station) throw new Error('Станция не найдена');
-    if (!verifyPassword(oldPassword, station.passwordHash)) {
-      throw new Error('Текущий пароль указан неверно');
-    }
-    station.passwordHash = hashPassword(newPassword);
-    writeRegistryRaw(registry);
-    return { ok: true };
-  });
-}
-
 async function deleteStation(id, { deleteMedia = false } = {}) {
   return withWriteLock(() => {
     const registry = readRegistryRaw();
@@ -297,12 +280,6 @@ async function updateGlobalSettings({ port, sourcePassword }) {
   });
 }
 
-function verifyStationPassword(id, password) {
-  const station = getStationInternal(id);
-  if (!station) return false;
-  return verifyPassword(password, station.passwordHash);
-}
-
 module.exports = {
   listStations,
   getStationInternal,
@@ -311,11 +288,9 @@ module.exports = {
   createStation,
   updateStationSettings,
   renameStation,
-  changeStationPassword,
   deleteStation,
   updateGlobalSettings,
   updateMediaBaseDir,
-  verifyStationPassword,
   mediaDirFor,
   getMediaBaseDir,
 };

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Radio Deck — станция</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
@@ -14,7 +15,7 @@
   <div class="lock-card">
     <div class="lock-led"></div>
     <h1 id="lockStationName">RADIO DECK</h1>
-    <p class="lock-sub">Введите пароль станции (или портала)</p>
+    <p class="lock-sub">Введите пароль портала</p>
     <input id="passwordInput" type="password" placeholder="Пароль" autofocus>
     <button id="unlockBtn">Войти</button>
     <p id="lockError" class="lock-error"></p>
@@ -38,14 +39,15 @@
         <span class="status-label">ICECAST</span>
         <span id="statusIcecast" class="status-value status-unknown">—</span>
       </div>
+      <div class="status-item">
+        <span class="status-label">СЛУШАТЕЛИ</span>
+        <span id="statusListeners" class="status-value status-unknown">—</span>
+      </div>
       <button id="refreshStatusBtn" class="btn-ghost" title="Обновить статус">↻</button>
     </div>
   </header>
 
-  <p class="shared-engine-note">
-    ⚠ Движок вещания общий для всех станций портала — перезапуск в блоке
-    TRANSPORT применит изменения и <strong>на этой, и на всех остальных станциях</strong>.
-  </p>
+  <p id="nowPlayingBanner" class="now-playing-banner hidden"></p>
 
   <main class="rack">
 
@@ -80,7 +82,7 @@
 
         <div class="field-row">
           <label>Адрес для слушателей</label>
-          <div class="listen-url" id="listenUrl">—</div>
+          <a class="listen-url" id="listenUrl" href="#" target="_blank" rel="noopener">—</a>
         </div>
 
         <div class="field-row">
@@ -112,18 +114,6 @@
       </div>
     </section>
 
-    <!-- МОДУЛЬ: ТРАНСПОРТ / УПРАВЛЕНИЕ -->
-    <section class="module module-wide">
-      <div class="module-plate">TRANSPORT</div>
-      <div class="module-body">
-        <p class="hint">Перезапускает общий движок и применяет сохранённые настройки всех станций портала.</p>
-        <div class="module-actions">
-          <button id="restartBtn" class="btn-danger">⟲ Перезапустить движок</button>
-          <span id="restartMsg" class="inline-msg"></span>
-        </div>
-      </div>
-    </section>
-
     <!-- МОДУЛЬ: МЕДИАТЕКА -->
     <section class="module module-wide">
       <div class="module-plate">
@@ -131,6 +121,11 @@
         <span class="module-plate-stats" id="libraryStats"></span>
       </div>
       <div class="module-body">
+
+        <div class="field-row">
+          <label for="uploadFolderInput">Загрузить в подпапку (необязательно)</label>
+          <input id="uploadFolderInput" type="text" placeholder="например: альбом-2024/live — оставьте пустым для корня">
+        </div>
 
         <div id="dropZone" class="drop-zone">
           <p>Перетащите аудиофайлы сюда или</p>
@@ -173,23 +168,14 @@
       </div>
     </section>
 
-    <!-- МОДУЛЬ: ПАРОЛЬ СТАНЦИИ -->
+    <!-- МОДУЛЬ: ТРАНСПОРТ / УПРАВЛЕНИЕ -->
     <section class="module module-wide">
-      <div class="module-plate">STATION ACCESS</div>
+      <div class="module-plate">TRANSPORT</div>
       <div class="module-body">
-        <div class="field-grid">
-          <div class="field-row">
-            <label for="oldPasswordInput">Текущий пароль станции</label>
-            <input id="oldPasswordInput" type="password">
-          </div>
-          <div class="field-row">
-            <label for="newPasswordInput">Новый пароль</label>
-            <input id="newPasswordInput" type="password">
-          </div>
-        </div>
+        <p class="hint">Перезапускает общий движок и применяет сохранённые настройки всех станций портала.</p>
         <div class="module-actions">
-          <button id="changePasswordBtn" class="btn-secondary">Сменить пароль</button>
-          <span id="changePasswordMsg" class="inline-msg"></span>
+          <button id="restartBtn" class="btn-danger">⟲ Перезапустить движок</button>
+          <span id="restartMsg" class="inline-msg"></span>
         </div>
       </div>
     </section>

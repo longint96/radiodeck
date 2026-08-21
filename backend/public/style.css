@@ -1,14 +1,14 @@
 :root {
-  --bg-deck: #14171a;
-  --panel: #1c2023;
-  --panel-border: #2c3236;
-  --panel-inset: #101315;
+  --bg-deck: #3a3d42;
+  --panel: #313438;
+  --panel-border: #494c52;
+  --panel-inset: #262930;
   --amber: #ffb000;
   --amber-dim: #7a5500;
   --green-live: #3ddc84;
   --red-alert: #ff4d4f;
-  --text-primary: #e8e6df;
-  --text-muted: #8b9096;
+  --text-primary: #f0efe9;
+  --text-muted: #b8bcc2;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
 }
@@ -28,7 +28,7 @@ body {
 
 /* Портал — чуть светлее базового фона консоли (только эта страница, station.html не трогаем) */
 body.portal-page {
-  background-color: #1d2226;
+  background-color: #44474c;
 }
 
 .hidden { display: none !important; }
@@ -98,7 +98,7 @@ body.portal-page {
   align-items: center;
   padding: 18px 28px;
   border-bottom: 1px solid var(--panel-border);
-  background: linear-gradient(180deg, #191c1f, #14171a);
+  background: linear-gradient(180deg, #34373c, #2e3136);
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand h1 {
@@ -113,8 +113,8 @@ body.portal-page {
   background: var(--text-muted);
 }
 .brand-dot.live {
-  background: var(--red-alert);
-  box-shadow: 0 0 10px var(--red-alert);
+  background: var(--green-live);
+  box-shadow: 0 0 10px var(--green-live);
   animation: blink 1.6s ease-in-out infinite;
 }
 @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
@@ -144,7 +144,7 @@ body.portal-page {
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   padding: 24px 28px;
-  max-width: 1100px;
+  max-width: 1375px;
   margin: 0 auto;
 }
 .module-wide { grid-column: 1 / -1; }
@@ -324,7 +324,7 @@ body.portal-page {
 .track-title { color: var(--text-primary); }
 .track-title-empty { color: var(--text-muted); font-style: italic; }
 .track-artist { display: block; font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-.track-filename { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+.track-filename { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); word-break: break-word; }
 .track-numeric { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
 .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
@@ -399,16 +399,20 @@ body.portal-page {
 
 /* ---------- Портал: карточки станций ---------- */
 .back-link {
-  color: var(--text-muted);
+  color: var(--amber);
   text-decoration: none;
   font-family: var(--font-mono);
-  font-size: 12px;
-  margin-right: 4px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-right: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--amber-dim);
+  border-radius: 4px;
 }
-.back-link:hover { color: var(--amber); }
+.back-link:hover { background: rgba(255,176,0,0.1); border-color: var(--amber); }
 
 .shared-engine-note {
-  max-width: 1100px;
+  max-width: 1375px;
   margin: 0 auto;
   padding: 10px 28px 0;
   font-size: 12px;
@@ -416,19 +420,80 @@ body.portal-page {
   line-height: 1.5;
 }
 
+.now-playing-banner {
+  max-width: 1375px;
+  margin: 10px auto 0;
+  padding: 10px 28px;
+  font-size: 13px;
+  color: var(--green-live);
+}
+
+/* ---------- Диаграмма слушателей по станциям ---------- */
+.listeners-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 180px;
+  padding: 20px 4px 0;
+  overflow-x: auto;
+}
+.listeners-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 56px;
+  flex: 1 0 56px;
+  height: 100%;
+}
+.listeners-bar-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+  margin-bottom: 6px;
+}
+.listeners-bar-track {
+  flex: 1;
+  width: 100%;
+  max-width: 36px;
+  background: var(--panel-inset);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px 3px 0 0;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.listeners-bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, var(--amber), var(--amber-dim));
+  min-height: 2px;
+  transition: height 0.4s ease;
+}
+.listeners-bar-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  text-align: center;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .station-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
 }
 .station-card {
   background: var(--panel-inset);
   border: 1px solid var(--panel-border);
   border-radius: 6px;
-  padding: 14px 16px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .station-card-header {
   display: flex;
@@ -452,7 +517,9 @@ body.portal-page {
   font-size: 11px;
   color: var(--amber);
   word-break: break-all;
+  text-decoration: none;
 }
+.station-card-url:hover { text-decoration: underline; }
 .station-card-meta {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -504,7 +571,7 @@ body.portal-page {
 /* ---------- Живой статус станции на карточке ---------- */
 .station-live-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-size: 12px;
   margin-top: 2px;
@@ -513,6 +580,7 @@ body.portal-page {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--text-muted);
   flex-shrink: 0;
+  margin-top: 4px;
 }
 .station-live-dot.live-on {
   background: var(--green-live);
@@ -522,11 +590,14 @@ body.portal-page {
   background: var(--red-alert);
 }
 .station-now-playing {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+}
+.station-listeners {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--amber);
 }
 
 @media (max-width: 760px) {

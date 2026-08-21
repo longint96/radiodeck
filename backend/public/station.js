@@ -3,7 +3,10 @@ const STATION_SLUG = decodeURIComponent(window.location.pathname.split('/').filt
 const API_BASE = `/api/stations/${encodeURIComponent(STATION_SLUG)}`;
 
 const state = {
-  password: sessionStorage.getItem(`stationPassword:${STATION_SLUG}`) || null,
+  // Общий ключ с portal.js: если админ уже вошёл на портал в этой вкладке/
+  // браузере, повторно вводить пароль на странице станции не придётся —
+  // отдельных паролей на станции больше нет, везде один пароль портала.
+  password: sessionStorage.getItem('portalPassword') || null,
   bitrate: null,
   mode: null,
   globalPort: null,
@@ -16,11 +19,11 @@ const app = document.getElementById('app');
 
 async function tryUnlock(password) {
   const res = await fetch(`${API_BASE}/settings`, {
-    headers: { 'X-Station-Password': password },
+    headers: { 'X-Portal-Password': password },
   });
   if (res.ok) {
     state.password = password;
-    sessionStorage.setItem(`stationPassword:${STATION_SLUG}`, password);
+    sessionStorage.setItem('portalPassword', password);
     lockScreen.classList.add('hidden');
     app.classList.remove('hidden');
     initApp();
@@ -53,7 +56,7 @@ async function api(path, options = {}) {
     ...options,
     headers: {
       ...(options.headers || {}),
-      'X-Station-Password': state.password,
+      'X-Portal-Password': state.password,
     },
   });
   const data = await res.json().catch(() => ({}));
@@ -99,9 +102,12 @@ function updateListenUrl() {
   const el = document.getElementById('listenUrl');
   if (!state.globalPort || !mount) {
     el.textContent = '—';
+    el.removeAttribute('href');
     return;
   }
-  el.textContent = `${window.location.hostname}:${state.globalPort}/${mount}`;
+  const url = `http://${window.location.hostname}:${state.globalPort}/${mount}`;
+  el.textContent = url.replace('http://', '');
+  el.href = url;
 }
 document.getElementById('mountInput').addEventListener('input', updateListenUrl);
 
@@ -143,35 +149,6 @@ document.getElementById('saveSettingsBtn').addEventListener('click', async () =>
   }
 });
 
-// ---------- Смена пароля станции ----------
-
-document.getElementById('changePasswordBtn').addEventListener('click', async () => {
-  const msg = document.getElementById('changePasswordMsg');
-  const oldPassword = document.getElementById('oldPasswordInput').value;
-  const newPassword = document.getElementById('newPasswordInput').value;
-
-  if (!newPassword || newPassword.length < 4) {
-    msg.textContent = 'Новый пароль должен быть не короче 4 символов';
-    return;
-  }
-
-  msg.textContent = 'Сохранение...';
-  try {
-    await api(`${API_BASE}/settings/password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ oldPassword, newPassword }),
-    });
-    state.password = newPassword;
-    sessionStorage.setItem(`stationPassword:${STATION_SLUG}`, newPassword);
-    document.getElementById('oldPasswordInput').value = '';
-    document.getElementById('newPasswordInput').value = '';
-    msg.textContent = 'Пароль изменён.';
-  } catch (err) {
-    msg.textContent = `Ошибка: ${err.message}`;
-  }
-});
-
 // ---------- Транспорт / статус ----------
 
 document.getElementById('restartBtn').addEventListener('click', async () => {
@@ -194,6 +171,25 @@ async function loadStatus() {
     const s = await api(`${API_BASE}/control/status`);
     renderStatus('statusLiquidsoap', s.liquidsoap);
     renderStatus('statusIcecast', s.icecast);
+
+    const listenersEl = document.getElementById('statusListeners');
+    listenersEl.classList.remove('status-on', 'status-off', 'status-unknown');
+    if (s.online && s.listeners != null) {
+      listenersEl.textContent = String(s.listeners);
+      listenersEl.classList.add('status-on');
+    } else {
+      listenersEl.textContent = '—';
+      listenersEl.classList.add('status-unknown');
+    }
+
+    const banner = document.getElementById('nowPlayingBanner');
+    if (s.online && s.nowPlayingTitle) {
+      banner.textContent = `▶ Сейчас играет: ${s.nowPlayingTitle}`;
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+
     const onAirDot = document.getElementById('onAirDot');
     onAirDot.classList.toggle('live', !!s.liquidsoap);
   } catch (err) {
@@ -280,9 +276,14 @@ function uploadFiles(fileList) {
   vuFill.style.width = '0%';
   label.textContent = '0%';
 
+  const folder = document.getElementById('uploadFolderInput').value.trim();
+  const uploadUrl = folder
+    ? `${API_BASE}/library/upload?folder=${encodeURIComponent(folder)}`
+    : `${API_BASE}/library/upload`;
+
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', `${API_BASE}/library/upload`);
-  xhr.setRequestHeader('X-Station-Password', state.password);
+  xhr.open('POST', uploadUrl);
+  xhr.setRequestHeader('X-Portal-Password', state.password);
 
   xhr.upload.addEventListener('progress', (e) => {
     if (!e.lengthComputable) return;
@@ -434,7 +435,7 @@ function formatDuration(totalSeconds) {
 async function deleteTrack(name) {
   if (!confirm(`Удалить «${name}» из медиатеки?`)) return;
   try {
-    await api(`${API_BASE}/library/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    await api(`${API_BASE}/library/file?path=${encodeURIComponent(name)}`, { method: 'DELETE' });
     loadLibrary();
   } catch (err) {
     alert(`Ошибка удаления: ${err.message}`);
@@ -482,7 +483,7 @@ async function openTagEditor(name) {
   tagModal.classList.remove('hidden');
 
   try {
-    const tags = await api(`${API_BASE}/library/${encodeURIComponent(name)}/tags`);
+    const tags = await api(`${API_BASE}/library/file/tags?path=${encodeURIComponent(name)}`);
     document.getElementById('tagTitle').value = tags.title;
     document.getElementById('tagArtist').value = tags.artist;
     document.getElementById('tagAlbum').value = tags.album;
@@ -502,9 +503,6 @@ function closeTagEditor() {
 }
 
 document.getElementById('tagCancelBtn').addEventListener('click', closeTagEditor);
-tagModal.addEventListener('click', (e) => {
-  if (e.target === tagModal) closeTagEditor();
-});
 
 document.getElementById('tagSaveBtn').addEventListener('click', async () => {
   if (!currentTagFile) return;
@@ -522,7 +520,7 @@ document.getElementById('tagSaveBtn').addEventListener('click', async () => {
   };
 
   try {
-    await api(`${API_BASE}/library/${encodeURIComponent(currentTagFile)}/tags`, {
+    await api(`${API_BASE}/library/file/tags?path=${encodeURIComponent(currentTagFile)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

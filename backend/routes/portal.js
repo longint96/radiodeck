@@ -20,13 +20,12 @@ router.get('/stations', (req, res) => {
 // POST /api/portal/stations — создать станцию
 router.post('/stations', async (req, res) => {
   try {
-    const { name, bitrate, mode, mount, password } = req.body;
+    const { name, bitrate, mode, mount } = req.body;
     const station = await registry.createStation({
       name,
       bitrate: bitrate !== undefined ? Number(bitrate) : undefined,
       mode,
       mount,
-      password,
     });
     liquidsoapConfigGen.regenerate();
     res.json({

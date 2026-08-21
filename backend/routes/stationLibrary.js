@@ -4,18 +4,14 @@ const fs = require('fs');
 const path = require('path');
 
 const { readTags, writeTags, isTagEditable } = require('../lib/tags');
-const { getMediaInfo } = require('../lib/mediaInfo');
+const { scanLibrary } = require('../lib/mediaScan');
 const { mediaDirFor } = require('../lib/stationRegistry');
+const { sanitizeSegment, sanitizeRelativePath, sanitizeFolderPath, listFilesRecursive } = require('../lib/safePath');
 
 // mergeParams — доступ к :stationId из родительского роутера, который его примонтировал
 const router = express.Router({ mergeParams: true });
 
 const ALLOWED_EXT = new Set(['.mp3', '.ogg', '.flac', '.wav', '.aac', '.m4a']);
-
-function sanitizeFilename(name) {
-  const base = path.basename(name);
-  return base.replace(/[^\w\-. а-яА-ЯёЁ]/gu, '_');
-}
 
 /**
  * req.station устанавливается middleware stationAuth выше по цепочке —
@@ -25,23 +21,21 @@ function getMediaDir(req) {
   return mediaDirFor(req.station.slug);
 }
 
-function resolveMediaPath(req, rawName) {
-  const mediaDir = getMediaDir(req);
-  const safeName = sanitizeFilename(rawName);
-  const filePath = path.join(mediaDir, safeName);
-  if (!filePath.startsWith(path.resolve(mediaDir))) {
-    throw new Error('Некорректный путь');
-  }
-  return { safeName, filePath, mediaDir };
-}
-
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = getMediaDir(req);
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
+    try {
+      // Целевая подпапка передаётся через query-параметр (?folder=...), а не
+      // поле формы — так она гарантированно доступна ДО того, как multer
+      // начнёт разбирать сам multipart-поток с файлами (в отличие от полей
+      // формы, порядок которых в теле запроса не гарантирован)
+      const { absPath } = sanitizeFolderPath(getMediaDir(req), req.query.folder || '');
+      fs.mkdirSync(absPath, { recursive: true });
+      cb(null, absPath);
+    } catch (err) {
+      cb(err);
+    }
   },
-  filename: (req, file, cb) => cb(null, sanitizeFilename(file.originalname)),
+  filename: (req, file, cb) => cb(null, sanitizeSegment(file.originalname)),
 });
 
 const upload = multer({
@@ -56,58 +50,26 @@ const upload = multer({
   },
 });
 
-// GET /api/stations/:stationId/library — список файлов медиатеки станции
+// GET /api/stations/:stationId/library — рекурсивный список файлов медиатеки
+// (включая подпапки). "name" в ответе — относительный путь от корня медиатеки
+// станции, например "album1/track.mp3", а не просто имя файла.
+//
+// Метаданные (теги, длительность, битрейт) читаются через scanLibrary —
+// единый проход через music-metadata (без дочерних процессов ffprobe на
+// каждый файл) с постоянным кэшем на диске по mtime/размеру. Раньше здесь
+// был неограниченный Promise.all, который на 900 файлах запускал до 900
+// одновременных ffprobe-подпроцессов и занимал 7-10 минут.
 router.get('/', async (req, res) => {
   const mediaDir = getMediaDir(req);
   fs.mkdirSync(mediaDir, { recursive: true });
 
-  let entries;
   try {
-    entries = await fs.promises.readdir(mediaDir, { withFileTypes: true });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+    const scanned = await scanLibrary(mediaDir);
 
-  try {
-    const files = await Promise.all(
-      entries
-        .filter((e) => e.isFile() && !e.name.startsWith('.tag-tmp-'))
-        .map(async (e) => {
-          const filePath = path.join(mediaDir, e.name);
-          const stat = await fs.promises.stat(filePath);
-
-          const entry = {
-            name: e.name,
-            sizeBytes: stat.size,
-            modifiedAt: stat.mtime,
-            tagsEditable: isTagEditable(filePath),
-            title: '',
-            artist: '',
-            durationSeconds: null,
-            bitrateKbps: null,
-          };
-
-          if (entry.tagsEditable) {
-            try {
-              const tags = await readTags(filePath);
-              entry.title = tags.title;
-              entry.artist = tags.artist;
-            } catch {
-              /* нет валидных тегов — оставляем пустыми */
-            }
-          }
-
-          try {
-            const info = await getMediaInfo(filePath);
-            entry.durationSeconds = info.durationSeconds;
-            entry.bitrateKbps = info.bitrateKbps;
-          } catch {
-            /* битый/нераспознанный файл — оставляем null, список не падает */
-          }
-
-          return entry;
-        })
-    );
+    const files = scanned.map((f) => ({
+      ...f,
+      tagsEditable: isTagEditable(path.join(mediaDir, f.name)),
+    }));
 
     files.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 
@@ -122,95 +84,98 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/stations/:stationId/library/upload
+// POST /api/stations/:stationId/library/upload?folder=album1%2Fsub — загрузка
+// файлов, опционально в указанную подпапку (создаётся автоматически)
 router.post('/upload', upload.array('files', 50), (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: 'Файлы не переданы (поле "files")' });
   }
+  const mediaDir = getMediaDir(req);
   res.json({
-    uploaded: req.files.map((f) => ({ name: f.filename, sizeBytes: f.size })),
+    uploaded: req.files.map((f) => ({
+      name: path.relative(mediaDir, f.path).split(path.sep).join('/'),
+      sizeBytes: f.size,
+    })),
   });
 });
 
-// DELETE /api/stations/:stationId/library — удалить ВСЕ файлы медиатеки станции
+// DELETE /api/stations/:stationId/library — удалить ВСЮ медиатеку станции
+// (включая все подпапки) и создать заново уже пустой корень
 router.delete('/', async (req, res) => {
   const mediaDir = getMediaDir(req);
-
-  let entries;
   try {
-    entries = await fs.promises.readdir(mediaDir, { withFileTypes: true });
-  } catch {
-    return res.json({ ok: true, deletedCount: 0 }); // папки нет — удалять нечего, не ошибка
-  }
-
-  const files = entries.filter((e) => e.isFile() && !e.name.startsWith('.tag-tmp-'));
-
-  try {
-    await Promise.all(files.map((e) => fs.promises.unlink(path.join(mediaDir, e.name))));
-    res.json({ ok: true, deletedCount: files.length });
+    const relPaths = await listFilesRecursive(mediaDir);
+    await fs.promises.rm(mediaDir, { recursive: true, force: true });
+    await fs.promises.mkdir(mediaDir, { recursive: true });
+    res.json({ ok: true, deletedCount: relPaths.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// DELETE /api/stations/:stationId/library/:filename
-router.delete('/:filename', (req, res) => {
-  let safeName, filePath;
+// DELETE /api/stations/:stationId/library/file?path=album1%2Ftrack.mp3
+// Путь передаётся через query-параметр, а не URL-сегмент — некоторые
+// конфигурации nginx/реверс-прокси нормализуют "%2F" обратно в "/" прямо
+// в пути ДО того, как запрос дойдёт до Node, что незаметно сломало бы
+// адресацию файлов в подпапках. Query-строку прокси такой нормализации
+// обычно не подвергают.
+router.delete('/file', (req, res) => {
+  let relPath, absPath;
   try {
-    ({ safeName, filePath } = resolveMediaPath(req, req.params.filename));
+    ({ relPath, absPath } = sanitizeRelativePath(getMediaDir(req), req.query.path || ''));
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 
-  fs.unlink(filePath, (err) => {
+  fs.unlink(absPath, (err) => {
     if (err) return res.status(404).json({ error: 'Файл не найден' });
-    res.json({ deleted: safeName });
+    res.json({ deleted: relPath });
   });
 });
 
-// GET /api/stations/:stationId/library/:filename/tags
-router.get('/:filename/tags', async (req, res) => {
-  let filePath;
+// GET /api/stations/:stationId/library/file/tags?path=album1%2Ftrack.mp3
+router.get('/file/tags', async (req, res) => {
+  let absPath;
   try {
-    ({ filePath } = resolveMediaPath(req, req.params.filename));
+    ({ absPath } = sanitizeRelativePath(getMediaDir(req), req.query.path || ''));
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 
-  if (!fs.existsSync(filePath)) {
+  if (!fs.existsSync(absPath)) {
     return res.status(404).json({ error: 'Файл не найден' });
   }
-  if (!isTagEditable(filePath)) {
+  if (!isTagEditable(absPath)) {
     return res.status(400).json({ error: 'Редактирование тегов поддерживается только для MP3, OGG и FLAC' });
   }
 
   try {
-    res.json(await readTags(filePath));
+    res.json(await readTags(absPath));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// PUT /api/stations/:stationId/library/:filename/tags
-router.put('/:filename/tags', async (req, res) => {
-  let filePath;
+// PUT /api/stations/:stationId/library/file/tags?path=album1%2Ftrack.mp3
+router.put('/file/tags', async (req, res) => {
+  let absPath;
   try {
-    ({ filePath } = resolveMediaPath(req, req.params.filename));
+    ({ absPath } = sanitizeRelativePath(getMediaDir(req), req.query.path || ''));
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 
-  if (!fs.existsSync(filePath)) {
+  if (!fs.existsSync(absPath)) {
     return res.status(404).json({ error: 'Файл не найден' });
   }
-  if (!isTagEditable(filePath)) {
+  if (!isTagEditable(absPath)) {
     return res.status(400).json({ error: 'Редактирование тегов поддерживается только для MP3, OGG и FLAC' });
   }
 
   const { title, artist, album, year, genre, trackNumber, comment } = req.body;
   try {
-    await writeTags(filePath, { title, artist, album, year, genre, trackNumber, comment });
-    res.json({ ok: true, tags: await readTags(filePath) });
+    await writeTags(absPath, { title, artist, album, year, genre, trackNumber, comment });
+    res.json({ ok: true, tags: await readTags(absPath) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

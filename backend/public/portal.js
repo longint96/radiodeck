@@ -3,6 +3,7 @@ const state = {
   globalPort: null,
   nowPlaying: {}, // slug -> {online, title, listeners}
   libraryStats: {}, // slug -> {count, totalDurationSeconds}
+  stations: [], // текущий список станций — нужен диаграмме слушателей
 };
 
 // ---------- Авторизация ----------
@@ -250,9 +251,43 @@ async function loadNowPlaying() {
     const data = await api('/api/portal/now-playing');
     data.stations.forEach((s) => { state.nowPlaying[s.slug] = s; });
     applyNowPlayingToCards();
+    renderListenersChart();
   } catch (err) {
     console.error(err);
   }
+}
+
+/**
+ * Столбчатая диаграмма текущего числа слушателей по станциям — X: названия
+ * станций, Y: текущее кол-во слушателей. Рисуется на чистом HTML/CSS
+ * (height в процентах), без графической библиотеки — та же дисциплина,
+ * что и у VU-метров в SYSTEM MONITOR.
+ */
+function renderListenersChart() {
+  const chart = document.getElementById('listenersChart');
+  if (!chart) return;
+
+  if (state.stations.length === 0) {
+    chart.innerHTML = '<p class="hint">Станций пока нет.</p>';
+    return;
+  }
+
+  const values = state.stations.map((s) => state.nowPlaying[s.slug]?.listeners ?? 0);
+  const maxValue = Math.max(1, ...values); // защита от деления на 0, когда везде 0
+
+  chart.innerHTML = state.stations.map((s, i) => {
+    const listeners = values[i];
+    const heightPct = Math.round((listeners / maxValue) * 100);
+    return `
+      <div class="listeners-bar-col" title="${escapeHtml(s.name)}: ${listeners} слушателей">
+        <div class="listeners-bar-value">${listeners}</div>
+        <div class="listeners-bar-track">
+          <div class="listeners-bar-fill" style="height: ${heightPct}%"></div>
+        </div>
+        <div class="listeners-bar-label">${escapeHtml(s.name)}</div>
+      </div>
+    `;
+  }).join('');
 }
 
 function applyNowPlayingToCards() {
@@ -263,6 +298,7 @@ function applyNowPlayingToCards() {
 
     const dot = card.querySelector('.station-live-dot');
     const nowPlayingEl = card.querySelector('.station-now-playing');
+    const listenersEl = card.querySelector('.station-listeners');
     if (dot) {
       dot.classList.toggle('live-on', info.online);
       dot.classList.toggle('live-off', !info.online);
@@ -271,6 +307,11 @@ function applyNowPlayingToCards() {
       nowPlayingEl.textContent = info.online
         ? (info.title ? info.title : 'в эфире')
         : 'офлайн';
+    }
+    if (listenersEl) {
+      listenersEl.textContent = info.online && info.listeners != null
+        ? `👤 ${info.listeners}`
+        : '';
     }
   });
 }
@@ -318,14 +359,18 @@ async function loadStations() {
   const grid = document.getElementById('stationGrid');
   try {
     const data = await api('/api/portal/stations');
+    state.stations = data.stations;
     document.getElementById('stationCount').textContent = `${data.stations.length} станций на портале`;
 
     if (data.stations.length === 0) {
       grid.innerHTML = '<p class="hint">Станций пока нет — создайте первую.</p>';
+      renderListenersChart();
       return;
     }
 
-    grid.innerHTML = data.stations.map((s) => `
+    grid.innerHTML = data.stations.map((s) => {
+      const streamUrl = `http://${window.location.hostname}:${state.globalPort || '8000'}/${s.mount}`;
+      return `
       <div class="station-card" data-slug="${escapeHtml(s.slug)}">
         <div class="station-card-header">
           <span class="station-card-name">${escapeHtml(s.name)}</span>
@@ -335,7 +380,8 @@ async function loadStations() {
           <span class="station-live-dot"></span>
           <span class="station-now-playing">—</span>
         </div>
-        <div class="station-card-url">${window.location.hostname}:${state.globalPort || '—'}/${escapeHtml(s.mount)}</div>
+        <span class="station-listeners"></span>
+        <a class="station-card-url" href="${escapeHtml(streamUrl)}" target="_blank" rel="noopener" title="Открыть поток">${escapeHtml(streamUrl.replace('http://', ''))}</a>
         <div class="station-card-meta">
           <span>${s.bitrate} кбит/с</span>
           <span class="station-library-stats">—</span>
@@ -345,13 +391,15 @@ async function loadStations() {
           <button class="track-action station-delete" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" title="Удалить станцию">✕</button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     grid.querySelectorAll('.station-delete').forEach((btn) => {
       btn.addEventListener('click', () => deleteStation(btn.dataset.id, btn.dataset.name));
     });
     applyNowPlayingToCards();
     applyLibraryStatsToCards();
+    renderListenersChart();
   } catch (err) {
     grid.innerHTML = `<p class="hint">Ошибка: ${escapeHtml(err.message)}</p>`;
   }
@@ -396,10 +444,49 @@ function setActiveSegment(container, value) {
   });
 }
 
+// ---------- Скачать плейлист (.m3u) со всеми станциями ----------
+
+document.getElementById('downloadPlaylistBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('downloadPlaylistBtn');
+  const originalText = btn.textContent;
+  btn.textContent = 'Формирую...';
+  btn.disabled = true;
+
+  try {
+    const data = await api('/api/portal/stations');
+    if (data.stations.length === 0) {
+      alert('Станций пока нет — плейлист будет пустым, сначала создайте хотя бы одну.');
+    }
+
+    const port = state.globalPort || '8000';
+    const lines = ['#EXTM3U'];
+    data.stations.forEach((s) => {
+      const url = `http://${window.location.hostname}:${port}/${s.mount}`;
+      lines.push(`#EXTINF:-1,${s.name}`);
+      lines.push('#EXTVLCOPT:network-caching=1000');
+      lines.push(url);
+    });
+
+    const blob = new Blob([lines.join('\n') + '\n'], { type: 'audio/x-mpegurl' });
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = 'radio-deck.m3u';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch (err) {
+    alert(`Ошибка формирования плейлиста: ${err.message}`);
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+});
+
 document.getElementById('createStationBtn').addEventListener('click', () => {
   document.getElementById('newStationName').value = '';
   document.getElementById('newStationMount').value = '';
-  document.getElementById('newStationPassword').value = '';
   document.getElementById('createStationMsg').textContent = '';
   createModal.classList.remove('hidden');
 });
@@ -414,17 +501,15 @@ document.getElementById('createStationSubmitBtn').addEventListener('click', asyn
   const msg = document.getElementById('createStationMsg');
   const name = document.getElementById('newStationName').value.trim();
   const mount = document.getElementById('newStationMount').value.trim();
-  const password = document.getElementById('newStationPassword').value;
 
   if (!name) { msg.textContent = 'Укажите название станции'; return; }
-  if (!password || password.length < 4) { msg.textContent = 'Пароль — минимум 4 символа'; return; }
 
   msg.textContent = 'Создание...';
   try {
     await api('/api/portal/stations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, mount: mount || undefined, bitrate: newBitrate, mode: newMode, password }),
+      body: JSON.stringify({ name, mount: mount || undefined, bitrate: newBitrate, mode: newMode }),
     });
     createModal.classList.add('hidden');
     loadStations();

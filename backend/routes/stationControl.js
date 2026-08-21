@@ -1,12 +1,37 @@
 const express = require('express');
 const serviceControl = require('../lib/serviceControl');
+const icecastStatus = require('../lib/icecastStatus');
+const registry = require('../lib/stationRegistry');
+const listenerHistory = require('../lib/listenerHistory');
 
 const router = express.Router({ mergeParams: true });
 
-// GET /api/stations/:stationId/control/status
+// GET /api/stations/:stationId/control/status — статус движка + живые
+// данные именно этой станции (слушатели, текущий трек) из Icecast
 router.get('/status', async (req, res) => {
   try {
-    res.json(await serviceControl.status());
+    const serviceStatus = await serviceControl.status();
+
+    const global = registry.getGlobalSettings();
+    const { stations } = await icecastStatus.getNowPlaying([req.station], global.port);
+    const own = stations[0] || { online: false, title: null, listeners: null };
+
+    res.json({
+      ...serviceStatus,
+      online: own.online,
+      nowPlayingTitle: own.title,
+      listeners: own.listeners,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/stations/:stationId/control/listeners-history — история числа
+// слушателей станции (снимки раз в 5 минут, ~7 суток)
+router.get('/listeners-history', (req, res) => {
+  try {
+    res.json({ history: listenerHistory.getHistory(req.station.slug) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

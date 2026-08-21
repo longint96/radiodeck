@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Radio Deck — портал</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
@@ -92,6 +93,32 @@
       </div>
     </section>
 
+    <!-- МОДУЛЬ: СПИСОК СТАНЦИЙ -->
+    <section class="module module-wide">
+      <div class="module-plate">STATIONS</div>
+      <div class="module-body">
+
+        <div class="module-actions" style="margin-bottom: 18px;">
+          <button id="createStationBtn" class="btn-primary">+ Создать станцию</button>
+          <button id="downloadPlaylistBtn" class="btn-secondary">📥 Скачать плейлист (.m3u)</button>
+        </div>
+
+        <div id="stationGrid" class="station-grid">
+          <p class="hint">Загрузка...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: СЛУШАТЕЛИ ПО СТАНЦИЯМ -->
+    <section class="module module-wide">
+      <div class="module-plate">LISTENERS</div>
+      <div class="module-body">
+        <div id="listenersChart" class="listeners-chart">
+          <p class="hint">Загрузка...</p>
+        </div>
+      </div>
+    </section>
+
     <!-- МОДУЛЬ: ПУТЬ К МЕДИАТЕКЕ -->
     <section class="module module-wide">
       <div class="module-plate">MEDIA STORAGE</div>
@@ -126,21 +153,6 @@
         <div class="module-actions">
           <button id="restartBtn" class="btn-danger">⟲ Перезапустить движок</button>
           <span id="restartMsg" class="inline-msg"></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- МОДУЛЬ: СПИСОК СТАНЦИЙ -->
-    <section class="module module-wide">
-      <div class="module-plate">STATIONS</div>
-      <div class="module-body">
-
-        <div class="module-actions" style="margin-bottom: 18px;">
-          <button id="createStationBtn" class="btn-primary">+ Создать станцию</button>
-        </div>
-
-        <div id="stationGrid" class="station-grid">
-          <p class="hint">Загрузка...</p>
         </div>
       </div>
     </section>
@@ -182,10 +194,6 @@
           <button data-value="normal" class="active">По порядку</button>
           <button data-value="random">Случайный</button>
         </div>
-      </div>
-      <div class="field-row">
-        <label for="newStationPassword">Пароль админки станции</label>
-        <input id="newStationPassword" type="password" placeholder="минимум 4 символа">
       </div>
 
       <div class="module-actions">

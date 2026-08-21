@@ -34,15 +34,4 @@ router.post('/', async (req, res) => {
   }
 });
 
-// POST /api/stations/:stationId/settings/password — смена пароля станции
-router.post('/password', async (req, res) => {
-  try {
-    const { oldPassword, newPassword } = req.body;
-    await registry.changeStationPassword(req.params.stationId, oldPassword, newPassword);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
 module.exports = router;

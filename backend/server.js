@@ -12,6 +12,7 @@ const stationSettingsRoutes = require('./routes/stationSettings');
 const stationControlRoutes = require('./routes/stationControl');
 const stationHistoryRoutes = require('./routes/stationHistory');
 const playHistory = require('./lib/playHistory');
+const listenerHistory = require('./lib/listenerHistory');
 
 const app = express();
 const PORT = process.env.PANEL_PORT || 3000;
@@ -73,4 +74,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Radio Deck портал запущен: http://localhost:${PORT} (build ${BUILD_VERSION})`);
   playHistory.startPolling();
+  listenerHistory.startPolling();
 });

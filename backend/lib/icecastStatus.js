@@ -4,6 +4,25 @@
 // видно именно то, вещает ли КОНКРЕТНАЯ станция прямо сейчас, а не просто
 // "процесс liquidsoap жив".
 
+const AUDIO_EXT_RE = /\.(mp3|ogg|flac|wav|aac|m4a)$/i;
+
+/**
+ * Если у трека пустые теги, liquidsoap (см. radio.liq, fallback_title)
+ * подставляет вместо title полный путь к файлу — иначе трек вообще выпал
+ * бы из "сейчас играет"/истории. Здесь сокращаем этот путь до последних
+ * двух сегментов ("папка/имя_файла.mp3"), чтобы не показывать в интерфейсе
+ * длинный абсолютный путь вида "/mediateka/radio/rock/album1/track.mp3".
+ * Настоящие теги (не похожие на путь к файлу) не трогаем вообще.
+ */
+function prettifyTitle(rawTitle) {
+  if (!rawTitle) return rawTitle;
+  if (rawTitle.includes('/') && AUDIO_EXT_RE.test(rawTitle)) {
+    const parts = rawTitle.split('/').filter(Boolean);
+    return parts.slice(-2).join('/');
+  }
+  return rawTitle;
+}
+
 async function fetchIcecastStatus(port) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
@@ -56,7 +75,7 @@ async function getMountStatuses(port) {
     if (!mount) continue;
     map.set(mount, {
       online: true,
-      title: src.title || src.yp_currently_playing || null,
+      title: prettifyTitle(src.title || src.yp_currently_playing || null),
       listeners: typeof src.listeners === 'number' ? src.listeners : null,
     });
   }
