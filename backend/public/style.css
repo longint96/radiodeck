@@ -401,10 +401,18 @@ body.portal-page {
 }
 .history-title {
   color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  overflow-x: auto;
+  flex: 1;
+  min-width: 0; /* критично для flex-детей с overflow — иначе не сжимается меньше содержимого */
+  padding-bottom: 2px; /* небольшой отступ, чтобы тонкий скроллбар не наезжал на текст */
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--panel-border) transparent;
 }
+.history-title::-webkit-scrollbar { height: 4px; }
+.history-title::-webkit-scrollbar-track { background: transparent; }
+.history-title::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+.history-title::-webkit-scrollbar-thumb:hover { background: var(--amber-dim); }
 
 .deck-footer {
   text-align: center;

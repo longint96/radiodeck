@@ -21,6 +21,7 @@ async function tryUnlock(password) {
     lockScreen.classList.add('hidden');
     app.classList.remove('hidden');
     initApp();
+    resetInactivityTimer();
     return true;
   }
   return false;
@@ -40,6 +41,31 @@ document.getElementById('passwordInput').addEventListener('keydown', (e) => {
 if (state.password) {
   tryUnlock(state.password);
 }
+
+// ---------- Автовыход при неактивности (5 минут) ----------
+
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
+let inactivityTimer = null;
+
+function resetInactivityTimer() {
+  if (!state.password) return; // не залогинены — сбрасывать нечего
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(autoLogout, INACTIVITY_TIMEOUT_MS);
+}
+
+function autoLogout() {
+  state.password = null;
+  sessionStorage.removeItem('portalPassword');
+  app.classList.add('hidden');
+  lockScreen.classList.remove('hidden');
+  document.getElementById('passwordInput').value = '';
+  document.getElementById('lockError').textContent =
+    'Сессия завершена из-за неактивности (5 минут). Введите пароль ещё раз.';
+}
+
+['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach((evt) => {
+  document.addEventListener(evt, resetInactivityTimer, { passive: true });
+});
 
 // ---------- Общий помощник для запросов ----------
 
