@@ -9,7 +9,11 @@ router.get('/', (req, res) => {
   // req.station уже загружен middleware stationAuth — отдаём публичную часть
   const { passwordHash, ...publicStation } = req.station;
   const global = registry.getGlobalSettings();
-  res.json({ ...publicStation, port: global.port });
+  res.json({
+    ...publicStation,
+    port: global.port,
+    mediaDir: registry.mediaDirFor(req.station.slug),
+  });
 });
 
 // POST /api/stations/:stationId/settings — mount / битрейт / режим

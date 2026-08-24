@@ -197,6 +197,138 @@ document.getElementById('fixPermissionsBtn').addEventListener('click', async () 
   }
 });
 
+// ---------- Резервная копия настроек ----------
+
+document.getElementById('downloadBackupBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('downloadBackupMsg');
+  msg.textContent = 'Формирую...';
+  try {
+    const res = await fetch('/api/portal/backup', {
+      headers: { 'X-Portal-Password': state.password },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Ошибка запроса (${res.status})`);
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `radio-deck-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+    msg.textContent = 'Готово.';
+  } catch (err) {
+    msg.textContent = `Ошибка: ${err.message}`;
+  }
+});
+
+// ---------- Восстановление из бэкапа ----------
+
+let restoreParsedBackup = null;
+
+document.getElementById('restoreFileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  const nameEl = document.getElementById('restoreFileName');
+  const btn = document.getElementById('restoreBackupBtn');
+  restoreParsedBackup = null;
+  btn.disabled = true;
+
+  if (!file) {
+    nameEl.textContent = '';
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (!parsed.global || !Array.isArray(parsed.stations)) {
+      throw new Error('файл не похож на бэкап Radio Deck (нет global/stations)');
+    }
+    restoreParsedBackup = parsed;
+    nameEl.textContent = `${file.name} — станций в файле: ${parsed.stations.length}`;
+    btn.disabled = false;
+  } catch (err) {
+    nameEl.textContent = `Не удалось прочитать файл: ${err.message}`;
+  }
+});
+
+document.getElementById('restoreBackupBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('restoreBackupMsg');
+  const reportEl = document.getElementById('restoreReport');
+  if (!restoreParsedBackup) return;
+
+  const stationCount = restoreParsedBackup.stations.length;
+  if (!confirm(
+    `Восстановить настройки станций из этого файла?\n\n` +
+    `В файле: ${stationCount} станций. Это ПОЛНОСТЬЮ заменит текущий список — ` +
+    `станции, которых нет в файле, пропадут из реестра (их файлы на диске не ` +
+    `удаляются). Движок будет автоматически перезапущен сразу после восстановления.`
+  )) {
+    return;
+  }
+
+  const typed = prompt('Это необратимо через интерфейс панели. Наберите слово ВОССТАНОВИТЬ, чтобы подтвердить:');
+  if (typed !== 'ВОССТАНОВИТЬ') {
+    msg.textContent = typed === null ? '' : 'Отменено — слово введено неверно.';
+    return;
+  }
+
+  msg.textContent = 'Восстанавливаю и перезапускаю движок...';
+  reportEl.classList.add('hidden');
+  try {
+    const result = await api('/api/portal/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(restoreParsedBackup),
+    });
+    msg.textContent = 'Готово. Движок перезапущен.';
+    reportEl.classList.remove('hidden');
+    reportEl.innerHTML = `
+      <div>Восстановлены станции: ${result.restoredStations.join(', ') || '—'}</div>
+      ${result.createdMediaDirs.length ? `<div>Созданы пустые папки медиатеки: ${result.createdMediaDirs.join(', ')}</div>` : ''}
+    `;
+    document.getElementById('restoreFileInput').value = '';
+    document.getElementById('restoreFileName').textContent = '';
+    restoreParsedBackup = null;
+    document.getElementById('restoreBackupBtn').disabled = true;
+    loadStations();
+    loadGlobal();
+  } catch (err) {
+    msg.textContent = `Ошибка: ${err.message}`;
+  }
+});
+
+// ---------- Перезагрузка сервера целиком (не движка) ----------
+
+document.getElementById('rebootServerBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('rebootServerMsg');
+
+  if (!confirm(
+    'Это перезагрузит ВЕСЬ СЕРВЕР, а не только движок вещания.\n\n' +
+    'Все станции остановятся, портал станет недоступен на 1-3 минуты ' +
+    '(зависит от хостинга). Продолжить?'
+  )) {
+    return;
+  }
+
+  const typed = prompt('Это необратимо запустит перезагрузку прямо сейчас. Наберите слово ПЕРЕЗАГРУЗИТЬ, чтобы подтвердить:');
+  if (typed !== 'ПЕРЕЗАГРУЗИТЬ') {
+    msg.textContent = typed === null ? '' : 'Отменено — слово введено неверно.';
+    return;
+  }
+
+  msg.textContent = 'Запускаю перезагрузку сервера...';
+  try {
+    const result = await api('/api/portal/reboot-server', { method: 'POST' });
+    msg.textContent = result.note || 'Перезагрузка запущена.';
+  } catch (err) {
+    msg.textContent = `Ошибка: ${err.message}`;
+  }
+});
+
 // ---------- Системный монитор ----------
 
 async function loadSystemStats() {

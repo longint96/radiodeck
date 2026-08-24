@@ -151,6 +151,7 @@ async function loadSettings() {
     setActiveSegment(bitrateSegmented, String(s.bitrate));
     setActiveSegment(modeSegmented, s.mode);
     updateListenUrl();
+    document.getElementById('mediaDirValue').textContent = s.mediaDir || '—';
   } catch (err) {
     console.error(err);
   }

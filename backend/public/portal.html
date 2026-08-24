@@ -119,10 +119,45 @@
       </div>
     </section>
 
-    <!-- МОДУЛЬ: ПУТЬ К МЕДИАТЕКЕ -->
+    <!-- МОДУЛЬ: НАСТРОЙКИ СЕРВЕРА (объединяет бывшие MEDIA STORAGE + TRANSPORT) -->
     <section class="module module-wide">
-      <div class="module-plate">MEDIA STORAGE</div>
+      <div class="module-plate">SERVER SETTINGS</div>
       <div class="module-body">
+
+        <p class="hint">
+          Резервная копия настроек станций (названия, mount, битрейт, режим,
+          путь к медиатеке) — БЕЗ самих файлов медиатеки, их нужно бэкапить
+          отдельно штатными средствами для файлов (например, rsync/tar на
+          уровне ОС).
+        </p>
+        <div class="module-actions">
+          <button id="downloadBackupBtn" class="btn-secondary">💾 Скачать резервную копию (.json)</button>
+          <span id="downloadBackupMsg" class="inline-msg"></span>
+        </div>
+
+        <p class="hint">
+          ⚠️ Восстановление из бэкапа <strong>полностью заменяет</strong>
+          текущий список станций — не объединяет с уже существующими.
+          Станции, которых нет в загружаемом файле, пропадут из реестра
+          (их файлы на диске не удаляются, только запись о станции и
+          вещание). Движок перезапускается автоматически сразу после
+          восстановления.
+        </p>
+        <div class="module-actions">
+          <label class="btn-secondary" style="cursor: pointer;">
+            📤 Выбрать файл бэкапа...
+            <input id="restoreFileInput" type="file" accept="application/json,.json" hidden>
+          </label>
+          <span id="restoreFileName" class="inline-msg"></span>
+        </div>
+        <div class="module-actions">
+          <button id="restoreBackupBtn" class="btn-danger" disabled>Восстановить из выбранного файла</button>
+          <span id="restoreBackupMsg" class="inline-msg"></span>
+        </div>
+        <div id="restoreReport" class="media-move-report hidden"></div>
+
+        <hr class="module-divider">
+
         <div class="field-row">
           <label for="mediaPathInput">Путь к медиатеке на диске (общий для всех станций, у каждой своя подпапка)</label>
           <input id="mediaPathInput" type="text" placeholder="/home/claude/radio-project/media">
@@ -156,17 +191,27 @@
           <button id="fixPermissionsBtn" class="btn-secondary">🔧 Исправить права на файлы медиатеки</button>
           <span id="fixPermissionsMsg" class="inline-msg"></span>
         </div>
-      </div>
-    </section>
 
-    <!-- МОДУЛЬ: ТРАНСПОРТ -->
-    <section class="module module-wide">
-      <div class="module-plate">TRANSPORT</div>
-      <div class="module-body">
-        <p class="hint">Перезапускает общий движок — применяет изменения сразу для ВСЕХ станций портала.</p>
+        <hr class="module-divider">
+
+        <p class="hint">Перезапускает общий движок вещания — применяет изменения сразу для ВСЕХ станций портала. НЕ трогает сам сервер/ОС.</p>
         <div class="module-actions">
           <button id="restartBtn" class="btn-danger">⟲ Перезапустить движок</button>
           <span id="restartMsg" class="inline-msg"></span>
+        </div>
+
+        <hr class="module-divider">
+
+        <p class="hint">
+          ⚠️ <strong>Перезагрузка ВСЕГО СЕРВЕРА</strong> (не только движка
+          вещания) — остановит все станции, сам портал станет недоступен на
+          время перезагрузки (обычно 1-3 минуты, зависит от хостинга).
+          Используйте только если это реально нужно (например, после
+          обновления системных пакетов на сервере).
+        </p>
+        <div class="module-actions">
+          <button id="rebootServerBtn" class="btn-danger">🔴 Перезагрузить сервер целиком</button>
+          <span id="rebootServerMsg" class="inline-msg"></span>
         </div>
       </div>
     </section>

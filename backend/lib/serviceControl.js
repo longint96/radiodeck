@@ -88,6 +88,20 @@ async function restart() {
   return restartProcess();
 }
 
+/**
+ * Полная перезагрузка ОПЕРАЦИОННОЙ СИСТЕМЫ сервера — НЕ то же самое, что
+ * restart() выше (тот перезапускает только наши процессы liquidsoap/icecast,
+ * этот роняет вообще всё, включая сам портал и SSH). Требует sudoers
+ * NOPASSWD именно для этой команды (см. README).
+ * systemctl reboot возвращает управление сразу же — сама перезагрузка
+ * начинается асинхронно, через несколько секунд после этого вызова, так
+ * что HTTP-ответ на запрос обычно успевает уйти клиенту до реального
+ * отключения сервера.
+ */
+async function rebootServer() {
+  await execAsync('sudo systemctl reboot');
+}
+
 async function status() {
   if (SERVICE_MODE === 'systemd') {
     return statusSystemd();
@@ -95,4 +109,4 @@ async function status() {
   return statusProcess();
 }
 
-module.exports = { restart, status };
+module.exports = { restart, status, rebootServer };

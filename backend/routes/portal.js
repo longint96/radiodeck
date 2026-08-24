@@ -173,4 +173,53 @@ router.post('/fix-media-permissions', async (req, res) => {
   }
 });
 
+// GET /api/portal/backup — скачать резервную копию настроек станций
+// (названия, mount, битрейт, режим, путь к медиатеке) БЕЗ самих файлов
+// медиатеки — их нужно бэкапить отдельно штатными средствами для файлов.
+router.get('/backup', (req, res) => {
+  try {
+    const backup = registry.exportBackup();
+    const dateStr = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Disposition', `attachment; filename="radio-deck-backup-${dateStr}.json"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.json(backup);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/portal/reboot-server — ПОЛНАЯ перезагрузка сервера (не только
+// движка вещания). Роняет вообще всё, включая сам портал — на время
+// перезагрузки панель будет недоступна, это ожидаемо, не ошибка.
+router.post('/reboot-server', async (req, res) => {
+  try {
+    // systemctl reboot планирует завершение работы и возвращает управление
+    // почти мгновенно — сама остановка сети происходит через несколько
+    // секунд после этого, так что успеваем корректно ответить клиенту
+    // (и, что важнее, УЗНАТЬ, реально ли sudo сработал, прежде чем
+    // рапортовать об успехе).
+    await serviceControl.rebootServer();
+    res.json({ ok: true, note: 'Перезагрузка запущена — сервер будет недоступен 1-3 минуты.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/portal/restore — ПОЛНАЯ замена текущего реестра станций
+// данными из бэкапа (см. GET /backup). НЕ слияние — станции, которых нет
+// в бэкапе, пропадут из реестра (их файлы на диске не трогаются, только
+// запись в реестре и конфиг liquidsoap). Регенерирует конфиги и сразу
+// перезапускает движок — иначе он продолжил бы работать со старым
+// составом станций до следующего ручного перезапуска.
+router.post('/restore', async (req, res) => {
+  try {
+    const result = await registry.importBackup(req.body);
+    liquidsoapConfigGen.regenerate();
+    await serviceControl.restart();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;

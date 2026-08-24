@@ -280,6 +280,146 @@ async function updateGlobalSettings({ port, sourcePassword }) {
   });
 }
 
+/**
+ * Экспорт для резервного копирования: названия/настройки станций и пути —
+ * НЕ сами файлы медиатеки (их бэкапить нужно отдельно, штатными средствами
+ * для файлов, например rsync/tar на уровне ОС). Явный whitelist полей
+ * (а не просто "всё кроме passwordHash") — безопаснее на случай, если в
+ * будущем в объект станции добавится ещё какое-то служебное поле, которое
+ * не должно попасть в бэкап по умолчанию.
+ */
+function exportBackup() {
+  const registry = readRegistryRaw();
+  return {
+    exportedAt: new Date().toISOString(),
+    global: {
+      port: registry.global.port,
+      sourcePassword: registry.global.sourcePassword,
+      mediaBaseDir: registry.global.mediaBaseDir,
+    },
+    stations: registry.stations.map((s) => ({
+      id: s.id,
+      slug: s.slug,
+      name: s.name,
+      mount: s.mount,
+      bitrate: s.bitrate,
+      mode: s.mode,
+      createdAt: s.createdAt,
+    })),
+  };
+}
+
+// Тот же формат slug, что производит slugify() — единственная защита от
+// path traversal через это поле: slug идёт прямо в mediaDirFor(slug) =
+// path.join(mediaBaseDir, slug), и раз бэкап теперь приходит извне
+// (загруженный файл, а не то, что мы сами сгенерировали), доверять ему
+// вслепую нельзя. Значение вроде "../../etc" будет отклонено целиком —
+// не "почищено", а именно отклонено, с понятной ошибкой.
+const SAFE_SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/**
+ * Полная замена текущего реестра данными из бэкапа (см. exportBackup выше).
+ * НЕ слияние — если в бэкапе нет какой-то станции, которая сейчас есть
+ * в реестре, эта станция из реестра пропадёт (её файлы на диске при этом
+ * не трогаются, только запись в реестре и, соответственно, конфиг
+ * liquidsoap). Осознанное решение в пользу предсказуемости — слияние
+ * с логикой "что делать при конфликте slug/mount" было бы куда менее
+ * предсказуемым поведением.
+ *
+ * Валидирует ВСЁ перед тем, как что-либо записать — при любой ошибке
+ * реестр остаётся полностью нетронутым (ничего не пишем частично).
+ */
+async function importBackup(backup) {
+  if (!backup || typeof backup !== 'object') {
+    throw new Error('Файл бэкапа повреждён или имеет неверный формат');
+  }
+  if (!backup.global || typeof backup.global !== 'object') {
+    throw new Error('В бэкапе отсутствует раздел global');
+  }
+  if (!Array.isArray(backup.stations)) {
+    throw new Error('В бэкапе отсутствует список станций');
+  }
+
+  const { port, sourcePassword, mediaBaseDir } = backup.global;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Некорректный порт в разделе global бэкапа');
+  }
+  if (!sourcePassword || typeof sourcePassword !== 'string') {
+    throw new Error('Отсутствует пароль источника в разделе global бэкапа');
+  }
+  if (!mediaBaseDir || typeof mediaBaseDir !== 'string' || !path.isAbsolute(mediaBaseDir)) {
+    throw new Error('Некорректный путь к медиатеке в разделе global бэкапа (должен быть абсолютным)');
+  }
+
+  const seenSlugs = new Set();
+  const seenMounts = new Set();
+  const importedStations = backup.stations.map((s, i) => {
+    const label = `станция #${i + 1}${s?.name ? ` (${s.name})` : ''}`;
+
+    if (!s || typeof s !== 'object') throw new Error(`${label}: некорректная запись`);
+    if (!s.slug || typeof s.slug !== 'string' || !SAFE_SLUG_RE.test(s.slug)) {
+      throw new Error(`${label}: некорректный slug "${s.slug}"`);
+    }
+    if (!s.name || typeof s.name !== 'string' || !s.name.trim()) {
+      throw new Error(`${label}: отсутствует название`);
+    }
+    if (!s.mount || typeof s.mount !== 'string' || !s.mount.trim()) {
+      throw new Error(`${label}: отсутствует mount-точка`);
+    }
+    try {
+      validateStationFields({ bitrate: s.bitrate, mode: s.mode });
+    } catch (err) {
+      throw new Error(`${label}: ${err.message}`);
+    }
+    if (s.bitrate === undefined || s.mode === undefined) {
+      throw new Error(`${label}: отсутствует битрейт или режим`);
+    }
+
+    const cleanMount = s.mount.trim().replace(/^\/+/, '');
+
+    if (seenSlugs.has(s.slug)) throw new Error(`Дублирующийся slug "${s.slug}" внутри бэкапа`);
+    if (seenMounts.has(cleanMount)) throw new Error(`Дублирующаяся mount-точка "${cleanMount}" внутри бэкапа`);
+    seenSlugs.add(s.slug);
+    seenMounts.add(cleanMount);
+
+    return {
+      id: (typeof s.id === 'string' && s.id) || crypto.randomBytes(6).toString('hex'),
+      slug: s.slug,
+      name: s.name.trim(),
+      mount: cleanMount,
+      bitrate: s.bitrate,
+      mode: s.mode,
+      createdAt: (typeof s.createdAt === 'string' && s.createdAt) || new Date().toISOString(),
+    };
+  });
+
+  return withWriteLock(() => {
+    const newRegistry = {
+      global: { port, sourcePassword, mediaBaseDir },
+      stations: importedStations,
+    };
+    writeRegistryRaw(newRegistry);
+
+    // Папки медиатеки могли не существовать (например, восстанавливаем
+    // на свежий инстанс) — создаём пустыми, если их ещё нет. Обычно
+    // предполагается, что сами файлы будут восстановлены/загружены
+    // отдельно, этот бэкап их не переносит.
+    const createdMediaDirs = [];
+    for (const station of importedStations) {
+      const dir = path.join(mediaBaseDir, station.slug);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        createdMediaDirs.push(station.slug);
+      }
+    }
+
+    return {
+      restoredStations: importedStations.map((s) => s.slug),
+      createdMediaDirs,
+    };
+  });
+}
+
 module.exports = {
   listStations,
   getStationInternal,
@@ -293,4 +433,6 @@ module.exports = {
   updateMediaBaseDir,
   mediaDirFor,
   getMediaBaseDir,
+  exportBackup,
+  importBackup,
 };
