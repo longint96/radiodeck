@@ -1,0 +1,148 @@
+{
+  "global": {
+    "port": 8000,
+    "sourcePassword": "jc4UoWnrXF9cfhl9zGWUGu4J",
+    "mediaBaseDir": "/mediateka/radio",
+    "domain": "air.longint.ru"
+  },
+  "stations": [
+    {
+      "id": "93b23086bdb8",
+      "slug": "rock",
+      "name": "rock",
+      "mount": "rock",
+      "bitrate": 256,
+      "mode": "random",
+      "passwordHash": "$2a$10$anb4tXzhxCTKf7FmElaBAe0/KqV8YQiFDDUnxG/D6gcgvWxWtgBTy",
+      "createdAt": "2026-08-20T10:38:31.874Z"
+    },
+    {
+      "id": "8473cbf385f9",
+      "slug": "fmcafe",
+      "name": "Александр Нуждин - FM Cafe",
+      "mount": "fmcafe",
+      "bitrate": 256,
+      "mode": "random",
+      "passwordHash": "$2a$10$DmspXmfPZvI2FIsV7QEyHOUU7NCL1dJDg3KxBkGUOIu2XwCbRJuyu",
+      "createdAt": "2026-08-20T11:11:36.756Z"
+    },
+    {
+      "id": "f5d91701efa8",
+      "slug": "testovaya",
+      "name": "Тестовая",
+      "mount": "test",
+      "bitrate": 128,
+      "mode": "random",
+      "passwordHash": "$2a$10$3cAVD.7HJArPVrRsl5k7.utAWoMf.L4u6PAxHLwyWfowAeMp3yGJ6",
+      "createdAt": "2026-08-21T04:20:52.596Z"
+    },
+    {
+      "id": "aeab2170583e",
+      "slug": "elektroshok",
+      "name": "Электрошок 2006-2009",
+      "mount": "elecktoshock",
+      "bitrate": 256,
+      "mode": "random",
+      "createdAt": "2026-08-21T05:00:18.199Z"
+    },
+    {
+      "id": "b8ba7b02558d",
+      "slug": "elektroshok-2010-2013",
+      "name": "Электрошок 2010-2013",
+      "mount": "electroshock2",
+      "bitrate": 128,
+      "mode": "random",
+      "createdAt": "2026-08-21T06:01:07.109Z"
+    },
+    {
+      "id": "b60f5e19f856",
+      "slug": "bigpodcast",
+      "name": "Василий Стрельников - The Big Podcast",
+      "mount": "bigpodcast",
+      "bitrate": 192,
+      "mode": "normal",
+      "createdAt": "2026-08-24T06:06:43.175Z"
+    },
+    {
+      "id": "ef6cb43e4dc6",
+      "slug": "essentialmix",
+      "name": "BBC1 - EssentialMix",
+      "mount": "essentialmix",
+      "bitrate": 256,
+      "mode": "random",
+      "createdAt": "2026-08-24T06:09:14.529Z"
+    },
+    {
+      "id": "3c955a147287",
+      "slug": "inoveschanie",
+      "name": "Василий Стрельников - Иновещание",
+      "mount": "inoveshanie",
+      "bitrate": 192,
+      "mode": "random",
+      "createdAt": "2026-08-24T06:29:39.311Z"
+    },
+    {
+      "id": "d48f84ab2a04",
+      "slug": "the-alligator-hour-with-joshua-homme",
+      "name": "The Alligator Hour with Joshua Homme",
+      "mount": "alligatorhour",
+      "bitrate": 256,
+      "mode": "random",
+      "createdAt": "2026-08-24T07:43:35.158Z"
+    },
+    {
+      "id": "51791f60cb53",
+      "slug": "ebanko-fm",
+      "name": "Ебанько ФМ",
+      "mount": "ebankofm",
+      "bitrate": 192,
+      "mode": "random",
+      "createdAt": "2026-08-24T08:05:36.398Z"
+    },
+    {
+      "id": "a29ea8e7455d",
+      "slug": "dj-kirillof-mixer",
+      "name": "Dj Kirillof - Mixer",
+      "mount": "mixer",
+      "bitrate": 256,
+      "mode": "random",
+      "createdAt": "2026-08-24T08:27:14.997Z"
+    },
+    {
+      "id": "c08c3beb9931",
+      "slug": "bachinskiy-i-stillavin",
+      "name": "Бачинский и Стиллавин",
+      "mount": "bach&stil",
+      "bitrate": 192,
+      "mode": "random",
+      "createdAt": "2026-08-24T08:30:16.407Z"
+    },
+    {
+      "id": "9e45513f5771",
+      "slug": "ultra",
+      "name": "Ultra",
+      "mount": "ultra",
+      "bitrate": 128,
+      "mode": "random",
+      "createdAt": "2026-08-24T08:37:35.539Z"
+    },
+    {
+      "id": "93309e55864d",
+      "slug": "stoner",
+      "name": "Stoner",
+      "mount": "stone",
+      "bitrate": 256,
+      "mode": "random",
+      "createdAt": "2026-08-24T08:38:03.404Z"
+    },
+    {
+      "id": "bd7d8b7db7a1",
+      "slug": "evgenika",
+      "name": "Евгеника",
+      "mount": "evgenika",
+      "bitrate": 256,
+      "mode": "random",
+      "createdAt": "2026-08-24T08:43:37.037Z"
+    }
+  ]
+}

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radio Deck — портал</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script src="/theme.js"></script>
+</head>
+<body class="portal-page">
+
+<div id="lockScreen" class="lock-screen">
+  <div class="lock-card">
+    <div class="lock-led"></div>
+    <h1>RADIO DECK</h1>
+    <p class="lock-sub">Портал — введите пароль администратора</p>
+    <input id="passwordInput" type="password" placeholder="Пароль портала" autofocus>
+    <button id="unlockBtn">Войти</button>
+    <p id="lockError" class="lock-error"></p>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+
+  <header class="deck-header">
+    <div class="brand">
+      <span class="brand-dot" id="onAirDot"></span>
+      <h1>RADIO DECK — PORTAL</h1>
+    </div>
+    <div class="status-strip">
+      <div class="status-item">
+        <span class="status-label">LIQUIDSOAP</span>
+        <span id="statusLiquidsoap" class="status-value status-unknown">—</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">ICECAST</span>
+        <span id="statusIcecast" class="status-value status-unknown">—</span>
+      </div>
+      <button id="refreshStatusBtn" class="btn-ghost" title="Обновить статус">↻</button>
+    </div>
+  </header>
+
+  <main class="rack">
+
+    <!-- МОДУЛЬ: СИСТЕМНЫЙ МОНИТОР -->
+    <section class="module">
+      <div class="module-plate">SYSTEM MONITOR</div>
+      <div class="module-body">
+        <div class="meter-row">
+          <div class="meter-label">
+            <span>CPU</span>
+            <span id="cpuPercentLabel">—</span>
+          </div>
+          <div class="vu-track"><div id="cpuMeterFill" class="vu-fill"></div></div>
+        </div>
+        <div class="meter-row">
+          <div class="meter-label">
+            <span>RAM</span>
+            <span id="ramLabel">—</span>
+          </div>
+          <div class="vu-track"><div id="ramMeterFill" class="vu-fill"></div></div>
+        </div>
+        <div class="meter-row">
+          <div class="meter-label">
+            <span>DISK (<span id="diskPathLabel">—</span>)</span>
+            <span id="diskLabel">—</span>
+          </div>
+          <div class="vu-track"><div id="diskMeterFill" class="vu-fill"></div></div>
+        </div>
+        <p class="hint" id="uptimeLabel"></p>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: ГЛОБАЛЬНЫЕ НАСТРОЙКИ ДВИЖКА -->
+    <section class="module">
+      <div class="module-plate">ENGINE SETTINGS</div>
+      <div class="module-body">
+        <div class="field-row">
+          <label for="globalPortInput">Порт вещания (общий для всех станций)</label>
+          <input id="globalPortInput" type="number" min="1" max="65535" placeholder="8000">
+        </div>
+        <div class="field-row">
+          <label for="globalSourcePasswordInput">Пароль источника (Icecast)</label>
+          <input id="globalSourcePasswordInput" type="text" placeholder="оставьте пустым, чтобы не менять">
+        </div>
+        <div class="field-row">
+          <label for="globalDomainInput">Домен (вместо IP в ссылках на поток)</label>
+          <input id="globalDomainInput" type="text" placeholder="radio.example.com — оставьте пустым для автоопределения по IP">
+        </div>
+        <div class="module-actions">
+          <button id="saveGlobalBtn" class="btn-primary">Сохранить</button>
+          <span id="saveGlobalMsg" class="inline-msg"></span>
+        </div>
+        <p class="hint">Станции различаются mount-точкой на этом порту (например /rock-fm.mp3), а не отдельными портами.</p>
+        <p class="hint">
+          Если поле «Домен» заполнено — во всех ссылках на поток (карточки
+          станций, страница станции, плейлист .m3u) вместо IP-адреса, по
+          которому вы сейчас открыли портал, будет подставлено это значение.
+          Не указывайте протокол (без <code>http://</code>) и порт — порт
+          уже добавляется отдельно, из поля выше.
+        </p>
+
+        <hr class="module-divider">
+
+        <div class="field-row">
+          <label>Цвет интерфейса (для различения нескольких серверов)</label>
+          <div id="settingsThemePicker" class="theme-picker"></div>
+        </div>
+        <p class="hint">
+          Хранится в браузере (не на сервере, не в вашем аккаунте) — у
+          каждого сервера, открытого в своей вкладке, может быть свой цвет.
+          Переживает выход из системы, виден уже на экране входа.
+        </p>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: СПИСОК СТАНЦИЙ -->
+    <section class="module module-wide">
+      <div class="module-plate">STATIONS</div>
+      <div class="module-body">
+
+        <div class="module-actions" style="margin-bottom: 18px;">
+          <button id="createStationBtn" class="btn-primary">+ Создать станцию</button>
+          <button id="downloadPlaylistBtn" class="btn-secondary">📥 Скачать плейлист (.m3u)</button>
+        </div>
+
+        <div id="stationGrid" class="station-grid">
+          <p class="hint">Загрузка...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: СЛУШАТЕЛИ ПО СТАНЦИЯМ -->
+    <section class="module module-wide">
+      <div class="module-plate">LISTENERS</div>
+      <div class="module-body">
+        <div id="listenersChart" class="listeners-chart">
+          <p class="hint">Загрузка...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ: НАСТРОЙКИ СЕРВЕРА (объединяет бывшие MEDIA STORAGE + TRANSPORT) -->
+    <section class="module module-wide">
+      <div class="module-plate">SERVER SETTINGS</div>
+      <div class="module-body">
+
+        <p class="hint">
+          Резервная копия настроек станций (названия, mount, битрейт, режим,
+          путь к медиатеке) — БЕЗ самих файлов медиатеки, их нужно бэкапить
+          отдельно штатными средствами для файлов (например, rsync/tar на
+          уровне ОС).
+        </p>
+        <div class="module-actions">
+          <button id="downloadBackupBtn" class="btn-secondary">💾 Скачать резервную копию (.json)</button>
+          <span id="downloadBackupMsg" class="inline-msg"></span>
+        </div>
+
+        <p class="hint">
+          ⚠️ Восстановление из бэкапа <strong>полностью заменяет</strong>
+          текущий список станций — не объединяет с уже существующими.
+          Станции, которых нет в загружаемом файле, пропадут из реестра
+          (их файлы на диске не удаляются, только запись о станции и
+          вещание). Движок перезапускается автоматически сразу после
+          восстановления.
+        </p>
+        <div class="module-actions">
+          <label class="btn-secondary" style="cursor: pointer;">
+            📤 Выбрать файл бэкапа...
+            <input id="restoreFileInput" type="file" accept="application/json,.json" hidden>
+          </label>
+          <span id="restoreFileName" class="inline-msg"></span>
+        </div>
+        <div class="module-actions">
+          <button id="restoreBackupBtn" class="btn-danger" disabled>Восстановить из выбранного файла</button>
+          <span id="restoreBackupMsg" class="inline-msg"></span>
+        </div>
+        <div id="restoreReport" class="media-move-report hidden"></div>
+
+        <hr class="module-divider">
+
+        <div class="field-row">
+          <label for="mediaPathInput">Путь к медиатеке на диске (общий для всех станций, у каждой своя подпапка)</label>
+          <input id="mediaPathInput" type="text" placeholder="/home/claude/radio-project/media">
+        </div>
+        <div class="module-actions">
+          <button id="saveMediaPathBtn" class="btn-danger">Сменить путь и перенести файлы</button>
+          <span id="saveMediaPathMsg" class="inline-msg"></span>
+        </div>
+        <p class="hint">
+          При смене пути папки всех станций <strong>автоматически переносятся</strong>
+          на новое место (не копируются с оставлением старых — исходные папки
+          удаляются после успешного переноса). Движок вещания перезапускается
+          <strong>сразу и автоматически</strong> — в отличие от остальных настроек
+          здесь это не отложено на отдельную кнопку, иначе до ручного перезапуска
+          все станции показались бы пустыми (движок ещё смотрел бы на старый путь).
+          Новый путь должен быть доступен для записи пользователю, от которого
+          работает панель.
+        </p>
+        <div id="mediaMoveReport" class="media-move-report hidden"></div>
+
+        <hr class="module-divider">
+
+        <p class="hint">
+          Если файлы попали в медиатеку в обход панели (например, залиты
+          напрямую через WinSCP/SFTP) — панель работает от системного
+          пользователя <code>radio</code> и может не иметь прав читать/писать
+          их ID3-теги. Эта кнопка восстанавливает владельца всех файлов
+          медиатеки на <code>radio</code>.
+        </p>
+        <div class="module-actions">
+          <button id="fixPermissionsBtn" class="btn-secondary">🔧 Исправить права на файлы медиатеки</button>
+          <span id="fixPermissionsMsg" class="inline-msg"></span>
+        </div>
+
+        <hr class="module-divider">
+
+        <p class="hint">Перезапускает общий движок вещания — применяет изменения сразу для ВСЕХ станций портала. НЕ трогает сам сервер/ОС.</p>
+        <div class="module-actions">
+          <button id="restartBtn" class="btn-danger">⟲ Перезапустить движок</button>
+          <span id="restartMsg" class="inline-msg"></span>
+        </div>
+
+        <hr class="module-divider">
+
+        <p class="hint">
+          ⚠️ <strong>Перезагрузка ВСЕГО СЕРВЕРА</strong> (не только движка
+          вещания) — остановит все станции, сам портал станет недоступен на
+          время перезагрузки (обычно 1-3 минуты, зависит от хостинга).
+          Используйте только если это реально нужно (например, после
+          обновления системных пакетов на сервере).
+        </p>
+        <div class="module-actions">
+          <button id="rebootServerBtn" class="btn-danger">🔴 Перезагрузить сервер целиком</button>
+          <span id="rebootServerMsg" class="inline-msg"></span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="deck-footer">
+    <span id="stationCount">— станций на портале</span>
+  </footer>
+</div>
+
+<div id="createModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="module-plate">СОЗДАТЬ СТАНЦИЮ</div>
+    <div class="module-body">
+
+      <div class="field-row">
+        <label for="newStationName">Название</label>
+        <input id="newStationName" type="text" placeholder="Rock FM">
+      </div>
+      <div class="field-row">
+        <label for="newStationMount">Точка монтирования (необязательно)</label>
+        <input id="newStationMount" type="text" placeholder="автоматически из названия">
+      </div>
+      <div class="field-row">
+        <label>Битрейт</label>
+        <div class="segmented" id="newBitrateSegmented">
+          <button data-value="64">64</button>
+          <button data-value="96">96</button>
+          <button data-value="128" class="active">128</button>
+          <button data-value="192">192</button>
+          <button data-value="256">256</button>
+          <button data-value="320">320</button>
+        </div>
+      </div>
+      <div class="field-row">
+        <label>Режим воспроизведения</label>
+        <div class="segmented" id="newModeSegmented">
+          <button data-value="normal" class="active">По порядку</button>
+          <button data-value="random">Случайный</button>
+        </div>
+      </div>
+
+      <div class="module-actions">
+        <button id="createStationSubmitBtn" class="btn-primary">Создать</button>
+        <button id="createStationCancelBtn" class="btn-secondary">Отмена</button>
+        <span id="createStationMsg" class="inline-msg"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/portal.js"></script>
+</body>
+</html>
